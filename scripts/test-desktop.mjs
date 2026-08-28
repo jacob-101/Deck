@@ -184,6 +184,53 @@ try {
     page.getByRole("spinbutton", { name: "Page number" }),
   ).toHaveValue("3");
   steps.push("Full document search and result navigation");
+  await page
+    .getByRole("button", { name: "Table of contents", exact: true })
+    .click();
+  await expect(page.locator(".outline-item")).toHaveCount(4);
+  await page
+    .getByRole("button", { name: "Yours to keep 4", exact: true })
+    .click();
+  await ready();
+  await expect(
+    page.getByRole("spinbutton", { name: "Page number" }),
+  ).toHaveValue("4");
+  await expect(page.locator(".page-stage .textLayer")).toContainText(
+    "Yours to keep.",
+  );
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "document-outline.png"),
+  });
+  await app.evaluate(({ Menu }) => {
+    const file = Menu.getApplicationMenu().items.find(
+      (item) => item.label === "File",
+    );
+    file.submenu.items
+      .find((item) => item.label === "Document Details…")
+      .click();
+  });
+  const details = page.getByRole("dialog", {
+    name: "Document details",
+    exact: true,
+  });
+  await expect(details).toContainText(
+    "Field Notes — A guide to OpenPDF Studio",
+  );
+  await expect(details).toContainText("OpenPDF Studio");
+  await expect(details.locator(".document-stats")).toContainText("4");
+  await page.keyboard.press("ArrowLeft");
+  await expect(page.locator(".page-navigation input")).toHaveValue("4");
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "document-details.png"),
+  });
+  await page.keyboard.press("Escape");
+  await expect(details).not.toBeVisible();
+  steps.push(
+    "Embedded table of contents navigates actual pages; native document details display metadata",
+  );
+
   await page.getByRole("button", { name: "Pages", exact: true }).click();
   await page.getByRole("button", { name: "Go to page 1", exact: true }).click();
   await ready();
@@ -201,6 +248,68 @@ try {
     "Verified: this note stays inside the saved PDF.",
   );
   steps.push("Note created from page coordinates");
+  await page
+    .getByRole("button", { name: "Edit annotation 1 on page 1", exact: true })
+    .click();
+  const annotationEditor = page.getByRole("dialog", {
+    name: "Edit annotation",
+    exact: true,
+  });
+  await expect(
+    annotationEditor.getByRole("button", { name: "Update annotation" }),
+  ).toBeDisabled();
+  await annotationEditor.getByLabel("Annotation contents").fill("");
+  await annotationEditor
+    .getByRole("button", { name: "Update annotation" })
+    .click();
+  await expect(annotationEditor.getByRole("alert")).toContainText(
+    "Add some text",
+  );
+  await annotationEditor
+    .getByLabel("Annotation contents")
+    .fill("Edited: this note stays inside the saved PDF.");
+  await annotationEditor
+    .getByRole("button", { name: "Blue color", exact: true })
+    .click();
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "annotation-editor.png"),
+  });
+  await annotationEditor
+    .getByRole("button", { name: "Update annotation" })
+    .click();
+  await noBusy();
+  await ready();
+  await expect(page.locator(".note-card")).toHaveCount(1);
+  await expect(page.locator(".note-card")).toContainText(
+    "Edited: this note stays inside the saved PDF.",
+  );
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await ready();
+  await expect(page.locator(".note-card")).toContainText(
+    "Verified: this note stays inside the saved PDF.",
+  );
+  await page.getByRole("button", { name: "Redo", exact: true }).click();
+  await ready();
+  await expect(page.locator(".note-card")).toContainText(
+    "Edited: this note stays inside the saved PDF.",
+  );
+  await page
+    .getByRole("button", { name: "Edit annotation 1 on page 1", exact: true })
+    .click();
+  await annotationEditor
+    .getByLabel("Annotation contents")
+    .fill("Cancel this draft");
+  await annotationEditor
+    .getByRole("button", { name: "Cancel", exact: true })
+    .click();
+  await expect(page.locator(".note-card")).toContainText(
+    "Edited: this note stays inside the saved PDF.",
+  );
+  steps.push(
+    "Edit annotation text and color, validate empty text, cancel drafts, and undo/redo changes",
+  );
+
   await page.getByRole("button", { name: "Rectangle", exact: true }).click();
   box = await page.locator(".page-stage .pdf-page").boundingBox();
   await page.mouse.move(box.x + 30, box.y + 40);
@@ -217,6 +326,23 @@ try {
   await ready();
   await expect(page.locator(".note-card")).toHaveCount(2);
   steps.push("Drawing and undo/redo");
+  await page
+    .getByRole("button", { name: "Edit annotation 2 on page 1", exact: true })
+    .click();
+  await annotationEditor.getByLabel("Annotation line weight").fill("5");
+  await annotationEditor
+    .getByLabel("Annotation contents")
+    .fill("Review this section.");
+  await annotationEditor
+    .getByRole("button", { name: "Update annotation" })
+    .click();
+  await noBusy();
+  await ready();
+  await expect(page.locator(".note-card").nth(1)).toContainText(
+    "Review this section.",
+  );
+  steps.push("Shape annotation line weight and comment editing");
+
   await page.getByRole("button", { name: "Highlight", exact: true }).click();
   const title = page
     .locator(".page-stage .textLayer span")
@@ -273,8 +399,10 @@ try {
   const first = doc.loadPage(0);
   const annots = first.getAnnotations();
   expect(annots.map((annotation) => annotation.getContents())).toContain(
-    "Verified: this note stays inside the saved PDF.",
+    "Edited: this note stays inside the saved PDF.",
   );
+  expect(annots[0].getColor()[2]).toBeCloseTo(214 / 255);
+  expect(annots[1].getBorderWidth()).toBe(5);
   annots.forEach((annotation) => annotation.destroy());
   first.destroy();
   doc.destroy();

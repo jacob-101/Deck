@@ -2,7 +2,7 @@
 
 A local PDF workspace for macOS. No accounts, no uploads, no telemetry.
 
-**Version 0.2:** the Forest & Paper identity, a generated macOS icon, and a complete persistent Settings workspace.
+**Version 0.3:** editable annotation properties, embedded table-of-contents navigation, and native document details. Includes the Forest & Paper identity and persistent Settings workspace.
 
 ## Run
 
@@ -33,7 +33,9 @@ The application is generated in `release/mac-arm64/OpenPDF Studio.app` on Apple 
 - Native PDF open/save dialogs, recent documents, Finder open-file events, drag and drop.
 - Page thumbnails, page navigation, zoom, fit page/width, fullscreen, text selection/copy, text search, dark mode.
 - Standard PDF highlights, underline, strike-through, ink, rectangles, ellipses, arrows, text boxes, sticky notes. Select text while a markup tool is active; drag to draw; click to place a note or text box.
-- Annotation list, jump to annotated page, remove annotations.
+- Annotation list, jump to annotated page, edit text/comments and color, adjust shape line weight, remove annotations. Locked annotations cannot be edited or deleted.
+- Embedded PDF table of contents, including nested sections and page destinations that follow page reordering. External destinations are not opened.
+- Document details: title, author, subject, creator, producer, PDF version, page dimensions, file size, and annotation count.
 - Rotate, duplicate, delete, drag or button reorder, merge, extract ranges, split to separate PDFs.
 - Named document history with undo/redo; annotations and page operations restore actual PDF bytes.
 - Save, Save As, close confirmation, file-change conflict detection, atomic replacement of saved files.
@@ -65,6 +67,7 @@ Viewer defaults apply when opening a document. Appearance and annotation default
 | ⌘+ / ⌘− / ⌘0 | Zoom in / out / fit page |
 | ⌘P | Print |
 | ⌘, | Settings |
+| ⌘I | Document details |
 | Left / right arrows | Previous / next page |
 | Escape | Return to selection tool |
 

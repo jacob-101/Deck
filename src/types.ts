@@ -53,6 +53,14 @@ export type AnnotationInfo = {
   type: string;
   contents: string;
   color: number[];
+  width: number | null;
+  editable: boolean;
+  locked: boolean;
+};
+export type AnnotationPatch = {
+  contents?: string;
+  color?: number[];
+  width?: number;
 };
 export type PageInfo = {
   width: number;
@@ -60,7 +68,24 @@ export type PageInfo = {
   rotation: number;
   annotations: AnnotationInfo[];
 };
-export type DocumentInfo = { pages: PageInfo[]; title: string };
+export type OutlineEntry = {
+  id: string;
+  title: string;
+  page: number | null;
+  open: boolean;
+  children: OutlineEntry[];
+};
+export type DocumentInfo = {
+  pages: PageInfo[];
+  title: string;
+  author: string;
+  subject: string;
+  creator: string;
+  producer: string;
+  format: string;
+  outline: OutlineEntry[];
+  outlineNotice: string | null;
+};
 export type EditCommand =
   | { type: "rotate"; page: number; angle: number }
   | { type: "reorder"; order: number[] }
@@ -68,4 +93,10 @@ export type EditCommand =
   | { type: "delete"; page: number }
   | { type: "merge"; bytes: Uint8Array }
   | { type: "annotate"; page: number; annotation: AnnotationInput }
+  | {
+      type: "update-annotation";
+      page: number;
+      id: number;
+      patch: AnnotationPatch;
+    }
   | { type: "remove-annotation"; page: number; id: number };

@@ -330,6 +330,7 @@ app.whenReady().then(async () => {
         submenu: [
           item("Open PDF…", "CmdOrCtrl+O", "open"),
           item("Close Document", "CmdOrCtrl+W", "close"),
+          item("Document Details…", "CmdOrCtrl+I", "properties"),
           { type: "separator" },
           item("Save", "CmdOrCtrl+S", "save"),
           item("Save As…", "CmdOrCtrl+Shift+S", "save-as"),
@@ -357,6 +358,7 @@ app.whenReady().then(async () => {
           item("Zoom In", "CmdOrCtrl+Plus", "zoom-in"),
           item("Zoom Out", "CmdOrCtrl+-", "zoom-out"),
           item("Fit Page", "CmdOrCtrl+0", "fit-page"),
+          item("Table of Contents", undefined, "contents"),
           { role: "togglefullscreen" },
           ...(app.isPackaged ? [] : [{ role: "toggleDevTools" as const }]),
         ],

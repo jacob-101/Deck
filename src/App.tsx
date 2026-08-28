@@ -6,6 +6,9 @@ import {
 } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
+  BookOpen,
+  LockKeyhole,
+  Pencil,
   ArrowDown,
   ArrowLeft,
   ArrowRight,
@@ -58,6 +61,8 @@ import { PDFPage, rgb } from "./components/PDFPage";
 import {
   MAX_FILE_SIZE,
   type AnnotationInput,
+  type AnnotationInfo,
+  type AnnotationPatch,
   type EditCommand,
   type OpenFile,
   type RecentFile,
@@ -67,6 +72,10 @@ import { parsePageRange } from "./core/ranges";
 import { ANNOTATION_COLORS, usePreferences } from "./core/preferences";
 import { Settings, type SettingsSection } from "./components/Settings";
 import { APP_VERSION, BrandIcon } from "./components/Brand";
+import { AnnotationEditor } from "./components/AnnotationEditor";
+import { DocumentDetails } from "./components/DocumentDetails";
+import { DocumentOutline } from "./components/DocumentOutline";
+import { annotationHex, annotationName } from "./core/annotation-style";
 GlobalWorkerOptions.workerSrc = workerUrl;
 
 const tools: {
@@ -154,6 +163,12 @@ type Modal =
 export default function App() {
   const state = useDocument();
   const { values: preferences, update: updatePreferences } = usePreferences();
+  const [editor, setEditor] = useState<{
+    annotation: AnnotationInfo;
+    page: number;
+    revisionId: string;
+  } | null>(null);
+  const [details, setDetails] = useState(false);
   const [settings, setSettings] = useState<SettingsSection | null>(null);
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches,
@@ -176,7 +191,9 @@ export default function App() {
   const [color, setColor] = useState(preferences.annotationColor);
   const [stroke, setStroke] = useState(preferences.strokeWidth);
   const [sidebar, setSidebar] = useState(preferences.showSidebar);
-  const [tab, setTab] = useState<"pages" | "search" | "notes">("pages");
+  const [tab, setTab] = useState<"pages" | "search" | "notes" | "contents">(
+    "pages",
+  );
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
   const [results, setResults] = useState<
@@ -423,6 +440,8 @@ export default function App() {
     state.load(result.bytes, result.info, file.name, file.id);
     applyDocumentDefaults();
     setSettings(null);
+    setDetails(false);
+    setEditor(null);
   };
   const chooseFile = (purpose: "open" | "merge" = "open") => {
     if (window.desktop)
@@ -471,6 +490,32 @@ export default function App() {
       state.commit(result.bytes, result.info, label);
       if (nextPage !== undefined) setPage(nextPage);
     });
+  const saveAnnotation = async (patch: AnnotationPatch) => {
+    const current = useDocument.getState();
+    const entry = current.revisions[current.cursor];
+    if (!editor || !entry || entry.id !== editor.revisionId)
+      throw new Error(
+        "The document changed. Close this editor and select the annotation again.",
+      );
+    if (busyRef.current)
+      throw new Error("Please wait for the current operation to finish.");
+    busyRef.current = true;
+    setBusy("Updating annotation…");
+    try {
+      const result = await pdfEngine.edit(entry.bytes, {
+        type: "update-annotation",
+        page: editor.page,
+        id: editor.annotation.id,
+        patch,
+      });
+      current.commit(result.bytes, result.info, "Edit annotation");
+      setEditor(null);
+      notify("Annotation updated. Save the PDF to keep your changes.");
+    } finally {
+      busyRef.current = false;
+      setBusy("");
+    }
+  };
   const movePage = (from: number, to: number) => {
     if (from === to || from < 0 || to < 0 || to >= count) return;
     const order = Array.from({ length: count }, (_, i) => i);
@@ -512,13 +557,24 @@ export default function App() {
       document.getElementById("print-root")?.replaceChildren();
       return;
     }
-    if (busyRef.current || modal) return;
+    if (
+      busyRef.current ||
+      ((modal || editor || details) && name !== "save-and-close")
+    )
+      return;
     if (name === "settings" || name === "about") {
       setSettings(name === "about" ? "about" : "general");
       return;
     }
     if (settings && name !== "save-and-close") return;
     switch (name) {
+      case "properties":
+        if (revision) setDetails(true);
+        break;
+      case "contents":
+        setSidebar(true);
+        setTab("contents");
+        break;
       case "open":
         chooseFile();
         break;
@@ -588,7 +644,7 @@ export default function App() {
         event.target instanceof HTMLElement &&
         !!event.target.closest('input, textarea, [contenteditable="true"]');
       if (event.key === "Escape") {
-        if (!settings && !modal) setTool("select");
+        if (!settings && !modal && !editor && !details) setTool("select");
         return;
       }
       if (!window.desktop && (event.metaKey || event.ctrlKey)) {
@@ -600,6 +656,7 @@ export default function App() {
         const command = (
           {
             ",": "settings",
+            i: "properties",
             o: "open",
             s: event.shiftKey ? "save-as" : "save",
             f: "search",
@@ -616,7 +673,14 @@ export default function App() {
           event.preventDefault();
           commands.current(command);
         }
-      } else if (!input && !modal && !settings && !busyRef.current) {
+      } else if (
+        !input &&
+        !modal &&
+        !settings &&
+        !editor &&
+        !details &&
+        !busyRef.current
+      ) {
         if (event.key === "ArrowRight" || event.key === "PageDown")
           setPage((value) => Math.min(count - 1, value + 1));
         if (event.key === "ArrowLeft" || event.key === "PageUp")
@@ -625,7 +689,7 @@ export default function App() {
     };
     window.addEventListener("keydown", keydown);
     return () => window.removeEventListener("keydown", keydown);
-  }, [count, modal, settings]);
+  }, [count, modal, settings, editor, details]);
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
       if (dirty && !window.desktop) event.preventDefault();
@@ -739,7 +803,7 @@ export default function App() {
       }}
       onDrop={(event) => {
         if (!event.dataTransfer.files.length) return;
-        if (settings || modal) {
+        if (settings || modal || editor || details) {
           event.preventDefault();
           setDragging(false);
           return;
@@ -781,6 +845,14 @@ export default function App() {
           )}
         </div>
         <div className="title-actions">
+          {revision && (
+            <IconButton
+              label="Document details"
+              onClick={() => setDetails(true)}
+            >
+              <Info size={16} />
+            </IconButton>
+          )}
           <IconButton
             label={dark ? "Use light appearance" : "Use dark appearance"}
             onClick={() =>
@@ -984,28 +1056,34 @@ export default function App() {
             {sidebar && (
               <aside className="sidebar">
                 <div className="sidebar-tabs">
-                  {(["pages", "search", "notes"] as const).map((item) => (
-                    <button
-                      key={item}
-                      className={tab === item ? "selected" : ""}
-                      onClick={() => setTab(item)}
-                      aria-label={
-                        item === "search"
-                          ? "Search document"
-                          : item === "notes"
-                            ? "Annotations"
-                            : "Pages"
-                      }
-                    >
-                      {item === "pages" ? (
-                        <Grid2X2 size={16} />
-                      ) : item === "search" ? (
-                        <Search size={16} />
-                      ) : (
-                        <MessageSquare size={16} />
-                      )}
-                    </button>
-                  ))}
+                  {(["pages", "contents", "search", "notes"] as const).map(
+                    (item) => (
+                      <button
+                        key={item}
+                        className={tab === item ? "selected" : ""}
+                        onClick={() => setTab(item)}
+                        aria-label={
+                          item === "search"
+                            ? "Search document"
+                            : item === "notes"
+                              ? "Annotations"
+                              : item === "contents"
+                                ? "Table of contents"
+                                : "Pages"
+                        }
+                      >
+                        {item === "pages" ? (
+                          <Grid2X2 size={16} />
+                        ) : item === "search" ? (
+                          <Search size={16} />
+                        ) : item === "contents" ? (
+                          <BookOpen size={16} />
+                        ) : (
+                          <MessageSquare size={16} />
+                        )}
+                      </button>
+                    ),
+                  )}
                 </div>
                 <div className="sidebar-heading">
                   <h2>
@@ -1013,7 +1091,9 @@ export default function App() {
                       ? "Pages"
                       : tab === "search"
                         ? "Find in document"
-                        : "Annotations"}
+                        : tab === "contents"
+                          ? "Contents"
+                          : "Annotations"}
                   </h2>
                   <span>
                     {tab === "pages"
@@ -1023,7 +1103,9 @@ export default function App() {
                             (sum, page) => sum + page.annotations.length,
                             0,
                           )
-                        : "⌘ F"}
+                        : tab === "contents"
+                          ? revision.info.outline.length
+                          : "⌘ F"}
                   </span>
                 </div>
                 {tab === "pages" ? (
@@ -1088,6 +1170,13 @@ export default function App() {
                       </IconButton>
                     </div>
                   </>
+                ) : tab === "contents" ? (
+                  <DocumentOutline
+                    entries={revision.info.outline}
+                    notice={revision.info.outlineNotice}
+                    page={page}
+                    onNavigate={showPage}
+                  />
                 ) : tab === "search" ? (
                   <div className="search-panel">
                     <div className="search-field">
@@ -1168,32 +1257,52 @@ export default function App() {
                               onClick={() => showPage(index)}
                             >
                               <span className="note-type">
+                                <i
+                                  className="note-color"
+                                  style={{
+                                    background: annotationHex(annotation.color),
+                                  }}
+                                />
                                 <MessageSquare size={13} />
-                                {annotation.type === "Text"
-                                  ? "Note"
-                                  : annotation.type}
+                                {annotationName(annotation.type)}
+                                {annotation.locked && <LockKeyhole size={11} />}
                                 <small>p. {index + 1}</small>
                               </span>
                               <p>
                                 {annotation.contents || "Drawing annotation"}
                               </p>
                             </button>
-                            <IconButton
-                              label={`Delete annotation ${annotation.id + 1} on page ${index + 1}`}
-                              disabled={!canEdit}
-                              onClick={() =>
-                                applyEdit(
-                                  {
-                                    type: "remove-annotation",
+                            <div className="note-actions">
+                              <IconButton
+                                label={`Edit annotation ${annotation.id + 1} on page ${index + 1}`}
+                                disabled={!canEdit || !annotation.editable}
+                                onClick={() =>
+                                  setEditor({
+                                    annotation,
                                     page: index,
-                                    id: annotation.id,
-                                  },
-                                  "Remove annotation",
-                                )
-                              }
-                            >
-                              <Trash2 size={13} />
-                            </IconButton>
+                                    revisionId: revision.id,
+                                  })
+                                }
+                              >
+                                <Pencil size={13} />
+                              </IconButton>
+                              <IconButton
+                                label={`Delete annotation ${annotation.id + 1} on page ${index + 1}`}
+                                disabled={!canEdit || annotation.locked}
+                                onClick={() =>
+                                  applyEdit(
+                                    {
+                                      type: "remove-annotation",
+                                      page: index,
+                                      id: annotation.id,
+                                    },
+                                    "Remove annotation",
+                                  )
+                                }
+                              >
+                                <Trash2 size={13} />
+                              </IconButton>
+                            </div>
                           </div>
                         )),
                       )
@@ -1549,6 +1658,24 @@ export default function App() {
             </div>
           </div>
         </main>
+      )}
+      {editor && (
+        <AnnotationEditor
+          annotation={editor.annotation}
+          page={editor.page}
+          onClose={() => setEditor(null)}
+          onSave={saveAnnotation}
+        />
+      )}
+      {details && revision && (
+        <DocumentDetails
+          info={revision.info}
+          name={state.name}
+          bytes={revision.bytes.length}
+          dirty={dirty}
+          page={page}
+          onClose={() => setDetails(false)}
+        />
       )}
       {settings && (
         <Settings

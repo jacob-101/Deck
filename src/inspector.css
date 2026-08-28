@@ -1,0 +1,238 @@
+.annotation-editor,
+.document-details {
+  width: 480px;
+  max-height: calc(100dvh - 56px);
+  overflow-y: auto;
+}
+.inspector-eyebrow {
+  display: block;
+  color: var(--green);
+  font-size: 9px;
+  letter-spacing: 1.3px;
+  text-transform: uppercase;
+  margin: 0 0 10px;
+}
+.inspector-eyebrow span {
+  margin: 0 6px;
+}
+.annotation-editor fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.annotation-editor textarea {
+  margin-top: 8px;
+  min-height: 100px;
+}
+.editor-style-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 15px;
+  margin-top: 21px;
+}
+.editor-colors {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 10px;
+}
+.editor-colors button {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: white;
+}
+.editor-colors button[aria-pressed="true"] {
+  outline: 1px solid var(--green);
+  outline-offset: 3px;
+}
+.editor-colors input[type="color"] {
+  width: 29px;
+  height: 29px;
+  padding: 3px;
+  border-radius: 6px;
+  margin-left: 3px;
+  cursor: pointer;
+}
+.editor-weight {
+  width: 100px;
+}
+.editor-weight > div {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.editor-weight input {
+  width: 70px;
+  padding: 5px 8px;
+  font-size: 11px;
+}
+.editor-weight span {
+  color: var(--muted);
+  font-size: 10px;
+}
+.editor-note {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.note-actions {
+  display: flex;
+  flex-direction: column;
+  padding-left: 3px;
+}
+.note-actions .icon-button {
+  width: 23px;
+  height: 23px;
+}
+.note-color {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px #0001;
+}
+.outline-panel {
+  overflow-y: auto;
+  padding: 5px 12px 16px;
+  min-height: 0;
+}
+.outline-panel ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.outline-panel ul ul {
+  border-left: 1px solid var(--line);
+  margin-left: 7px;
+  padding-left: 9px;
+}
+.outline-item {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  text-align: left;
+  padding: 10px 9px;
+  font-size: 11px;
+  line-height: 1.5;
+  border-radius: 5px;
+  margin-bottom: 3px;
+}
+.outline-item span {
+  overflow-wrap: anywhere;
+}
+.outline-item small {
+  color: var(--muted);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+.outline-item:hover,
+.outline-item[aria-current="location"] {
+  background: var(--green-soft);
+  color: var(--green);
+}
+.outline-item[aria-current="location"] {
+  font-weight: 550;
+}
+.outline-panel summary {
+  cursor: pointer;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  list-style: none;
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 10px 0;
+  overflow-wrap: anywhere;
+}
+.outline-panel summary::-webkit-details-marker {
+  display: none;
+}
+.outline-panel details[open] > summary > svg {
+  transform: rotate(90deg);
+}
+.outline-group-page {
+  color: var(--green);
+  font-size: 10px;
+  padding: 0 0 10px 16px;
+}
+.outline-footnote,
+.outline-notice {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.65;
+  margin: 18px 9px 0;
+}
+.document-details h2 {
+  overflow-wrap: anywhere;
+  font-size: 22px;
+}
+.document-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  background: var(--green-soft);
+  border-radius: 8px;
+  padding: 16px 0;
+  margin: 19px 0;
+}
+.document-stats > div {
+  text-align: center;
+  border-right: 1px solid color-mix(in srgb, var(--green) 15%, transparent);
+}
+.document-stats > div:last-child {
+  border: 0;
+}
+.document-stats strong {
+  display: block;
+  font-size: 24px;
+  font-weight: 550;
+  letter-spacing: -1px;
+  color: var(--green);
+}
+.document-stats span {
+  display: block;
+  margin-top: 5px;
+  font-size: 10px;
+  color: var(--green);
+}
+.document-metadata {
+  margin: 0;
+}
+.document-metadata > div {
+  display: grid;
+  grid-template-columns: 93px 1fr;
+  gap: 16px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.document-metadata dt {
+  color: var(--muted);
+}
+.document-metadata dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  user-select: text;
+}
+.document-metadata .metadata-empty {
+  color: var(--muted);
+  font-style: italic;
+}
+.details-privacy {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10px;
+  color: var(--green);
+  margin-top: 19px;
+}

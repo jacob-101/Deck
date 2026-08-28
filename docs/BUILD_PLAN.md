@@ -24,3 +24,7 @@ MuPDF has an AGPL option. The application is developed as AGPL-3.0-only with not
 ## Verification
 
 Unit tests run actual MuPDF operations on generated PDFs and reopen saved bytes. Desktop integration tests run Electron, open a sample, verify page operations, annotations, search, history, sandbox settings and export. Inspect a screenshot of the actual app.
+
+## Version 0.3 continuation
+
+Improve the existing reader and annotation workflow: edit existing annotation contents, colors, and line weights; navigate embedded outlines; inspect document metadata. Annotation updates use the PDF worker and existing byte history, preserve page content, and respect annotation locks. Outline navigation is restricted to valid destinations in the current document. Native File → Document Details and View → Table of Contents provide menu entry points.

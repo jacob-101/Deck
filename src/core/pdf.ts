@@ -4,7 +4,29 @@ import {
   type DocumentInfo,
   type EditCommand,
   type AnnotationInput,
+  type AnnotationPatch,
+  type OutlineEntry,
 } from "../types";
+
+const editableTypes = new Set([
+  "Text",
+  "FreeText",
+  "Line",
+  "Square",
+  "Circle",
+  "Highlight",
+  "Underline",
+  "StrikeOut",
+  "Ink",
+]);
+function annotationLocked(annotation: mupdf.PDFAnnotation) {
+  return !!(
+    annotation.getFlags() &
+    (mupdf.PDFAnnotation.IS_READ_ONLY |
+      mupdf.PDFAnnotation.IS_LOCKED |
+      mupdf.PDFAnnotation.IS_LOCKED_CONTENTS)
+  );
+}
 
 function open(bytes: Uint8Array) {
   if (bytes.byteLength > MAX_FILE_SIZE)
@@ -42,11 +64,69 @@ function checkPage(doc: mupdf.PDFDocument, index: number) {
   if (!Number.isInteger(index) || index < 0 || index >= doc.countPages())
     throw new Error("Page no longer exists.");
 }
+function readOutline(
+  doc: mupdf.PDFDocument,
+): Pick<DocumentInfo, "outline" | "outlineNotice"> {
+  let remaining = 2000;
+  let truncated = false;
+  type Item = NonNullable<ReturnType<typeof doc.loadOutline>>[number];
+  const walk = (items: Item[], prefix = "", depth = 0): OutlineEntry[] => {
+    if (depth >= 20) {
+      truncated ||= items.length > 0;
+      return [];
+    }
+    const result: OutlineEntry[] = [];
+    for (const [index, item] of items.entries()) {
+      if (--remaining < 0) {
+        truncated = true;
+        break;
+      }
+      const id = `${prefix}${index}`;
+      const page =
+        item.uri?.startsWith("#") &&
+        typeof item.page === "number" &&
+        Number.isInteger(item.page) &&
+        item.page >= 0 &&
+        item.page < doc.countPages()
+          ? item.page
+          : null;
+      result.push({
+        id,
+        title: item.title?.slice(0, 300) || "Untitled section",
+        page,
+        open: item.open,
+        children: walk(item.down ?? [], `${id}.`, depth + 1),
+      });
+    }
+    return result;
+  };
+  try {
+    const outline = walk(doc.loadOutline() ?? []);
+    return {
+      outline,
+      outlineNotice: truncated
+        ? "Showing the first 2,000 entries and 20 levels of this contents list."
+        : null,
+    };
+  } catch {
+    return {
+      outline: [],
+      outlineNotice:
+        "This PDF’s contents list could not be read. You can still navigate by page.",
+    };
+  }
+}
 export function inspect(bytes: Uint8Array): DocumentInfo {
   const doc = open(bytes);
   try {
     return {
       title: doc.getMetaData("info:Title") ?? "",
+      author: doc.getMetaData("info:Author") ?? "",
+      subject: doc.getMetaData("info:Subject") ?? "",
+      creator: doc.getMetaData("info:Creator") ?? "",
+      producer: doc.getMetaData("info:Producer") ?? "",
+      format: doc.getMetaData("format") ?? "PDF",
+      ...readOutline(doc),
       pages: Array.from({ length: doc.countPages() }, (_, index) => {
         const page = doc.loadPage(index);
         const object = page.getObject();
@@ -62,7 +142,17 @@ export function inspect(bytes: Uint8Array): DocumentInfo {
               id,
               type: annotation.getType(),
               contents: annotation.getContents(),
-              color: annotation.getColor(),
+              color:
+                annotation.getType() === "FreeText"
+                  ? annotation.getDefaultAppearance().color
+                  : annotation.getColor(),
+              width: annotation.hasBorder()
+                ? annotation.getBorderWidth()
+                : null,
+              editable:
+                editableTypes.has(annotation.getType()) &&
+                !annotationLocked(annotation),
+              locked: annotationLocked(annotation),
             })),
           };
         } finally {
@@ -76,6 +166,61 @@ export function inspect(bytes: Uint8Array): DocumentInfo {
   } finally {
     doc.destroy();
   }
+}
+function updateAnnotation(
+  annotation: mupdf.PDFAnnotation,
+  patch: AnnotationPatch,
+) {
+  const type = annotation.getType();
+  if (annotationLocked(annotation))
+    throw new Error("This annotation is locked by the document.");
+  if (!editableTypes.has(type))
+    throw new Error("Editing this annotation type is not supported yet.");
+  if (
+    !patch ||
+    typeof patch !== "object" ||
+    Array.isArray(patch) ||
+    !Object.keys(patch).length ||
+    Object.keys(patch).some(
+      (key) => !["contents", "color", "width"].includes(key),
+    )
+  )
+    throw new Error("No annotation changes supplied.");
+  if (patch.contents !== undefined) {
+    if (typeof patch.contents !== "string" || patch.contents.length > 5000)
+      throw new Error("Annotation text must be 5,000 characters or fewer.");
+    if ((type === "Text" || type === "FreeText") && !patch.contents.trim())
+      throw new Error("Add some text first.");
+  }
+  if (
+    patch.color !== undefined &&
+    (!Array.isArray(patch.color) ||
+      patch.color.length !== 3 ||
+      !patch.color.every((c) => Number.isFinite(c) && c >= 0 && c <= 1))
+  )
+    throw new Error("Choose a valid annotation color.");
+  if (
+    patch.width !== undefined &&
+    (!Number.isFinite(patch.width) ||
+      patch.width < 0 ||
+      patch.width > 20 ||
+      !annotation.hasBorder())
+  )
+    throw new Error("Choose a line weight between 0 and 20 pt.");
+  if (patch.contents !== undefined) annotation.setContents(patch.contents);
+  if (patch.color !== undefined) {
+    if (type === "FreeText") {
+      const appearance = annotation.getDefaultAppearance();
+      annotation.setDefaultAppearance(
+        appearance.font,
+        appearance.size,
+        patch.color as mupdf.AnnotColor,
+      );
+    } else annotation.setColor(patch.color as mupdf.AnnotColor);
+  }
+  if (patch.width !== undefined) annotation.setBorderWidth(patch.width);
+  annotation.setModificationDate(new Date());
+  annotation.update();
 }
 function addAnnotation(page: mupdf.PDFPage, input: AnnotationInput) {
   if (
@@ -196,13 +341,19 @@ export function edit(bytes: Uint8Array, command: EditCommand): Uint8Array {
         }
         break;
       }
+      case "update-annotation":
       case "remove-annotation": {
         const page = doc.loadPage(command.page);
         const annotations = page.getAnnotations();
         try {
           const annotation = annotations[command.id];
-          if (!annotation) throw new Error("This annotation no longer exists.");
-          page.deleteAnnotation(annotation);
+          if (!Number.isInteger(command.id) || !annotation)
+            throw new Error("This annotation no longer exists.");
+          if (annotationLocked(annotation))
+            throw new Error("This annotation is locked by the document.");
+          if (command.type === "update-annotation")
+            updateAnnotation(annotation, command.patch);
+          else page.deleteAnnotation(annotation);
         } finally {
           annotations.forEach((annotation) => annotation.destroy());
           page.destroy();
@@ -405,6 +556,22 @@ export function createSample(): Uint8Array {
       page.destroy();
     });
     doc.setMetaData("info:Title", "Field Notes — A guide to OpenPDF Studio");
+    doc.setMetaData("info:Author", "OpenPDF Studio");
+    doc.setMetaData("info:Subject", "A hands-on guide to your PDF workspace");
+    doc.setMetaData("info:Creator", "OpenPDF Studio");
+    const outline = doc.outlineIterator();
+    try {
+      [
+        "Read with intention",
+        "Make your mark",
+        "Organize your pages",
+        "Yours to keep",
+      ].forEach((title, index) =>
+        outline.insert({ title, uri: `#page=${index + 1}`, open: true }),
+      );
+    } finally {
+      outline.destroy();
+    }
     return serialize(doc);
   } finally {
     f1.destroy();

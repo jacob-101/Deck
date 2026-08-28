@@ -3,8 +3,8 @@
 ## Passed
 
 - TypeScript check and Vite/Electron production build.
-- 22 unit tests against real MuPDF documents and actual temporary files.
-- 20 Electron desktop scenarios, run against both the source build and the packaged Apple Silicon `.app`.
+- 28 unit tests against real MuPDF documents and actual temporary files.
+- 23 Electron desktop scenarios, run against both the source build and the packaged Apple Silicon `.app`.
 - Gstack browser verification at 980 × 650: sample PDF opened, rendered with selectable text, interactive controls present, no browser console errors. Version 0.2 Settings and welcome layouts also checked at the minimum size.
 - Visual inspection of welcome, reader, organizer, and minimum-window screenshots.
 
@@ -24,9 +24,18 @@ The desktop harness supplies native dialog choices but calls the real preload, I
 - Validation rejects unsupported preference values, tolerates damaged/unavailable storage, and migrates the original light/dark preference.
 - Final packaged-app run: 20 scenarios passed, zero renderer errors. Unit suite: 22 passed.
 
+## Version 0.3 reader and annotation checks
+
+- Final production build, 28 unit tests, and 23 packaged Electron scenarios passed with zero renderer errors.
+- Existing note text/color and shape line weight/comments update in the PDF, survive native Save and reopening, and restore through undo/redo. Empty text is rejected; canceling a draft leaves the document unchanged.
+- FreeText changes preserve its font size and rectangle; edits leave underlying page text intact. Locked annotations reject edits and deletion.
+- Embedded contents navigate to real pages and keep correct destinations after page reordering. HTTP links and actual external GoToR actions are non-navigable. PDFs without an outline remain supported.
+- Native File → Document Details and browser ⌘I open the metadata dialog. Page shortcuts do not navigate the background document while it is open.
+- Gstack checked the contents/details flow and annotation editor at 980 × 650; console clean. Details remain scrollable at the minimum window height.
+
 ## Packaging
 
-`release/mac-arm64/OpenPDF Studio.app`, Electron 44.0.0, macOS arm64. Version 0.2.0. Local unsigned distribution. No upload or public release performed.
+`release/mac-arm64/OpenPDF Studio.app`, Electron 44.0.0, macOS arm64. Version 0.3.0. Local unsigned distribution. No upload or public release performed.
 
 ## Not verified
 
