@@ -8,7 +8,9 @@ const output = resolve("test-results");
 await mkdir(output, { recursive: true });
 const temp = await mkdtemp(join(tmpdir(), "openpdf-desktop-"));
 const app = await electron.launch({
-  args: ["."],
+  ...(process.env.OPENPDF_TEST_EXECUTABLE
+    ? { executablePath: process.env.OPENPDF_TEST_EXECUTABLE }
+    : { args: ["."] }),
   env: { ...process.env, OPENPDF_TEST_USER_DATA: join(temp, "profile") },
 });
 const page = await app.firstWindow();
