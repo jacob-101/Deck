@@ -14,7 +14,7 @@ import { join, basename, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { readFile, mkdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { atomicSave, readPDF, stamp, validateBytes, writeJSON } from "./files";
+import { atomicSave, readPDF, stamp, validateBytes, writeJSON, writeText } from "./files";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -188,6 +188,26 @@ function registerIPC() {
     }
     return true;
   });
+  ipcMain.handle(
+    "files:export-markdown",
+    async (event, markdown: unknown, name: unknown) => {
+      trusted(event);
+      if (typeof markdown !== "string" || markdown.length > 10 * 1024 * 1024)
+        throw new Error("Markdown export is limited to 10 MB.");
+      const safeName =
+        typeof name === "string" && name.toLowerCase().endsWith(".md")
+          ? basename(name)
+          : "Document.md";
+      const result = await dialog.showSaveDialog(win, {
+        title: "Export Markdown",
+        defaultPath: safeName,
+        filters: [{ name: "Markdown document", extensions: ["md"] }],
+      });
+      if (result.canceled || !result.filePath) return false;
+      await writeText(result.filePath, markdown);
+      return true;
+    },
+  );
   ipcMain.handle("document:confirm", (event) => {
     trusted(event);
     return confirmClose();

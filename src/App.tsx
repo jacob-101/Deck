@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   getDocument,
   GlobalWorkerOptions,
+  type PDFDocumentLoadingTask,
   type PDFDocumentProxy,
 } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -23,6 +24,7 @@ import {
   Download,
   FilePlus2,
   FileText,
+  FileSearch,
   FolderOpen,
   Grid2X2,
   Highlighter,
@@ -82,6 +84,7 @@ import { APP_VERSION, BrandIcon } from "./components/Brand";
 import { AnnotationEditor } from "./components/AnnotationEditor";
 import { SignatureModal, type SignatureResult } from "./components/SignatureModal";
 import { DocumentDetails } from "./components/DocumentDetails";
+import { DocumentAnalysis } from "./components/DocumentAnalysis";
 import { DocumentOutline } from "./components/DocumentOutline";
 import { annotationHex, annotationName } from "./core/annotation-style";
 GlobalWorkerOptions.workerSrc = workerUrl;
@@ -183,6 +186,7 @@ export default function App() {
     revisionId: string;
   } | null>(null);
   const [details, setDetails] = useState(false);
+  const [analysis, setAnalysis] = useState(false);
   const [settings, setSettings] = useState<SettingsSection | null>(null);
   const [systemDark, setSystemDark] = useState(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches,
@@ -194,6 +198,7 @@ export default function App() {
   const revision = state.revisions[state.cursor];
   const dirty = !!revision && revision.id !== state.saved;
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
+  const pdfTaskRef = useRef<PDFDocumentLoadingTask | null>(null);
   const [page, setPage] = useState(0);
   const [scaleMode, setScaleMode] = useState<"page" | "width" | "manual">(
     preferences.defaultFit,
@@ -339,9 +344,15 @@ export default function App() {
     viewport.current?.scrollTo({ top: 0, left: 0 });
   }, [page]);
   useEffect(() => {
-    setPdf(null);
-    if (!revision) return;
+    if (!revision) {
+      const previous = pdfTaskRef.current;
+      pdfTaskRef.current = null;
+      setPdf(null);
+      void previous?.destroy();
+      return;
+    }
     let cancelled = false;
+    let settled = false;
     const root = new URL("./pdfjs/", window.location.href).href;
     const loading = getDocument({
       data: revision.bytes.slice(),
@@ -353,7 +364,17 @@ export default function App() {
     });
     void loading.promise
       .then((document) => {
-        if (!cancelled) setPdf(document);
+        settled = true;
+        if (cancelled) {
+          void loading.destroy();
+          return;
+        }
+        const previous = pdfTaskRef.current;
+        pdfTaskRef.current = loading;
+        setPdf(document);
+        // Let React hand the new document to PDFPage before releasing the old
+        // one whose rendered pixels remain visible during the swap.
+        if (previous) setTimeout(() => void previous.destroy(), 0);
       })
       .catch((cause) => {
         if (!cancelled)
@@ -361,9 +382,16 @@ export default function App() {
       });
     return () => {
       cancelled = true;
-      void loading.destroy();
+      if (!settled) void loading.destroy();
     };
   }, [revision, reportError]);
+  useEffect(
+    () => () => {
+      void pdfTaskRef.current?.destroy();
+      pdfTaskRef.current = null;
+    },
+    [],
+  );
   useEffect(() => {
     let cancelled = false;
     const needle = search.trim().toLowerCase();
@@ -1013,6 +1041,13 @@ export default function App() {
                 )}
               </IconButton>
               <span className="divider" />
+              <IconButton
+                label="Analyze document"
+                disabled={!!busy}
+                onClick={() => setAnalysis(true)}
+              >
+                <FileSearch size={17} />
+              </IconButton>
               <button
                 className="text-button"
                 disabled={!!busy}
@@ -1525,7 +1560,7 @@ export default function App() {
                 <div className="page-stage">
                   {pdf ? (
                     <PDFPage
-                      key={`${revision.id}-${page}`}
+                      key={page}
                       pdf={pdf}
                       pageNumber={page + 1}
                       scale={scale}
@@ -1839,6 +1874,13 @@ export default function App() {
           dirty={dirty}
           page={page}
           onClose={() => setDetails(false)}
+        />
+      )}
+      {analysis && revision && (
+        <DocumentAnalysis
+          bytes={revision.bytes}
+          name={state.name}
+          onClose={() => setAnalysis(false)}
         />
       )}
       {settings && (

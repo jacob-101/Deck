@@ -87,7 +87,8 @@ export const PDFPage = memo(function PDFPage({
     let cancelled = false;
     let render: RenderTask | undefined;
     let textLayer: TextLayer | undefined;
-    setReady(false);
+    const firstRender = !canvas.current?.width;
+    if (firstRender) setReady(false);
     const run = async () => {
       const page = await pdf.getPage(pageNumber);
       if (cancelled || !canvas.current || !text.current) return;
@@ -96,18 +97,24 @@ export const PDFPage = memo(function PDFPage({
         ? 1.5
         : Math.min(window.devicePixelRatio || 1, 2);
       setSize({ width: viewport.width, height: viewport.height });
-      const surface = canvas.current;
+      // Render offscreen. Resizing the visible canvas clears it immediately and
+      // caused a full-page flash after every annotation revision.
+      const surface = document.createElement("canvas");
       surface.width = Math.ceil(viewport.width * density);
       surface.height = Math.ceil(viewport.height * density);
-      surface.style.width = `${viewport.width}px`;
-      surface.style.height = `${viewport.height}px`;
       render = page.render({
         canvas: surface,
         viewport,
         transform: [density, 0, 0, density, 0, 0],
       });
       await render.promise;
-      if (cancelled) return;
+      if (cancelled || !canvas.current) return;
+      const visibleSurface = canvas.current;
+      visibleSurface.width = surface.width;
+      visibleSurface.height = surface.height;
+      visibleSurface.style.width = `${viewport.width}px`;
+      visibleSurface.style.height = `${viewport.height}px`;
+      visibleSurface.getContext("2d")?.drawImage(surface, 0, 0);
       text.current.replaceChildren();
       if (!thumbnail) {
         textLayer = new TextLayer({

@@ -8,6 +8,8 @@ const api: DesktopAPI = {
   save: (bytes, id, name, saveAs) =>
     ipcRenderer.invoke("files:save", bytes, id, name, saveAs),
   exportFiles: (files) => ipcRenderer.invoke("files:export", files),
+  exportMarkdown: (markdown, name) =>
+    ipcRenderer.invoke("files:export-markdown", markdown, name),
   setDirty: (value) => ipcRenderer.send("document:dirty", value),
   confirmClose: () => ipcRenderer.invoke("document:confirm"),
   closeWindow: () => ipcRenderer.send("window:close"),

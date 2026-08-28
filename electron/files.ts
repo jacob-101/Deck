@@ -68,3 +68,8 @@ export async function writeJSON(path: string, value: unknown) {
   await mkdir(dirname(path), { recursive: true });
   await writeFile(path, JSON.stringify(value), { mode: 0o600 });
 }
+export async function writeText(path: string, value: string) {
+  if (typeof value !== "string" || value.length > 10 * 1024 * 1024)
+    throw new Error("Markdown export is limited to 10 MB.");
+  await writeFile(path, value, { flag: "w", mode: 0o600 });
+}

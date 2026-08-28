@@ -125,6 +125,24 @@ try {
     path: join(output, "reader.png"),
   });
   steps.push("Worker generated and rendered actual PDF with selectable text");
+  const markdown = join(temp, "Field Notes.md");
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath: path });
+  }, markdown);
+  await page.getByRole("button", { name: "Analyze document", exact: true }).click();
+  const analysis = page.getByRole("dialog", { name: "Document analysis", exact: true });
+  await expect(analysis).toBeVisible();
+  await expect(analysis).toContainText("Text-based PDF", { timeout: 30000 });
+  await expect(analysis.locator("#markdown-preview")).toContainText(
+    "A little less friction",
+  );
+  await analysis.getByRole("button", { name: "Export Markdown", exact: true }).click();
+  await expect(analysis).toContainText("Markdown exported");
+  await expect(readFile(markdown, "utf8")).resolves.toContain(
+    "A little less friction",
+  );
+  await analysis.getByRole("button", { name: "Done", exact: true }).click();
+  steps.push("Local document classification and native Markdown export");
   await expect(page.getByLabel("Page fit", { exact: true })).toHaveValue(
     "width",
   );
@@ -236,6 +254,18 @@ try {
   await ready();
   await page.getByRole("button", { name: "Annotate", exact: true }).click();
   await page.getByRole("button", { name: "Sticky note", exact: true }).click();
+  await page.evaluate(() => {
+    window.__openpdfPageBlinked = false;
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector(".page-stage .pdf-page"))
+        window.__openpdfPageBlinked = true;
+    });
+    observer.observe(document.querySelector(".page-stage"), {
+      childList: true,
+      subtree: true,
+    });
+    window.__openpdfBlinkObserver = observer;
+  });
   let box = await page.locator(".page-stage .pdf-page").boundingBox();
   await page.mouse.click(box.x + box.width * 0.78, box.y + box.height * 0.3);
   await page
@@ -247,6 +277,12 @@ try {
   await expect(page.locator(".note-card")).toContainText(
     "Verified: this note stays inside the saved PDF.",
   );
+  expect(
+    await page.evaluate(() => {
+      window.__openpdfBlinkObserver?.disconnect();
+      return window.__openpdfPageBlinked;
+    }),
+  ).toBe(false);
   steps.push("Note created from page coordinates");
   await page
     .getByRole("button", { name: "Edit annotation 1 on page 1", exact: true })

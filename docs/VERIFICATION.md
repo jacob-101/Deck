@@ -4,7 +4,8 @@
 
 - TypeScript check and Vite/Electron production build.
 - 34 unit tests against real MuPDF documents, preferences storage error handling, and actual temporary files.
-- 25 Electron desktop scenarios, run against both the source build and the packaged Apple Silicon `.app`.
+- 26 Electron desktop scenarios, run against both the source build and the packaged Apple Silicon `.app`.
+- Local PDF Inspector classification and Markdown extraction/export run in a dedicated Web Worker; native export was verified against a temporary `.md` file. The drawing regression check confirms annotation updates never remove the visible page stage.
 - Full verification of Add Text (FreeText) with custom font sizes, font families (`Helv`, `Cour`), text colors, multiline/Unicode text (`Café Approval — 100€ ©`), interactive move/resize bounding box on page canvas, and undo/redo.
 - Full verification of Sign (Stamp) workflow across Draw, Type, and Import modes, aspect-ratio preserved corner resizing, opt-in local storage error handling, deletion controls, image format/pixel limits (PNG/JPEG, max 5 MB / 4096px), and persistent rendering in saved PDFs without fallback stamps.
 - MuPDF `setRect` restriction verification: confirmed `setRect()` is safely executed on `FreeText`, `Stamp`, `Square`, `Circle`, and `Text` annotations while guarded against unsupported stroke annotations (`Line`, `Ink`, `Highlight`, etc.).

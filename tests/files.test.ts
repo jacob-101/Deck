@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdtemp, readFile, rm, writeFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { atomicSave, readPDF, stamp, validateBytes } from "../electron/files";
+import { atomicSave, readPDF, stamp, validateBytes, writeText } from "../electron/files";
 const folders: string[] = [];
 afterEach(async () => {
   await Promise.all(
@@ -36,5 +36,13 @@ describe("authorized filesystem operations", () => {
     expect(() =>
       validateBytes(new TextEncoder().encode("<html>bad</html>")),
     ).toThrow("not a PDF");
+  });
+  it("writes Markdown locally and rejects oversized exports", async () => {
+    const folder = await mkdtemp(join(tmpdir(), "openpdf-markdown-"));
+    folders.push(folder);
+    const path = join(folder, "document.md");
+    await writeText(path, "# Local export\n\nNo upload.");
+    expect(await readFile(path, "utf8")).toContain("Local export");
+    await expect(writeText(path, "x".repeat(10 * 1024 * 1024 + 1))).rejects.toThrow("10 MB");
   });
 });

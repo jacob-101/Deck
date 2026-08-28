@@ -14,6 +14,7 @@ export type DesktopAPI = {
     saveAs: boolean,
   ): Promise<SaveResult>;
   exportFiles(files: { name: string; bytes: Uint8Array }[]): Promise<boolean>;
+  exportMarkdown(markdown: string, name: string): Promise<boolean>;
   setDirty(value: boolean): void;
   confirmClose(): Promise<"save" | "discard" | "cancel">;
   closeWindow(): void;

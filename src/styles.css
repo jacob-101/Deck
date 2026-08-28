@@ -593,6 +593,12 @@ button {
   background: #f8f7f380;
   pointer-events: none;
 }
+.analysis-dialog { width: min(720px, calc(100vw - 40px)); max-height: calc(100vh - 40px); overflow: auto; }
+.analysis-progress { min-height: 170px; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--muted); }
+.analysis-summary { display: flex; flex-direction: column; gap: 5px; padding: 16px; margin: 18px 0; border: 1px solid var(--line); border-radius: 10px; background: var(--soft); }
+.analysis-summary strong { font-size: 18px; }
+.analysis-summary span, .analysis-caveat { color: var(--muted); font-size: 13px; }
+.markdown-preview { max-height: 230px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0 14px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .spinner {
   display: inline-block;
   width: 16px;
