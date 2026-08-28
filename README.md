@@ -1,0 +1,89 @@
+# OpenPDF Studio
+
+A local PDF workspace for macOS. No accounts, no uploads, no telemetry.
+
+## Run
+
+Requires Node.js 22.12+ and npm. On the first setup, dependency installation downloads Electron. PDF.js fonts, character maps, and MuPDF WebAssembly are bundled locally; opening and editing PDFs does not require a network connection.
+
+```sh
+npm ci
+npm run dev
+```
+
+For a production build:
+
+```sh
+npm run build
+npm start
+```
+
+Create an unsigned macOS application:
+
+```sh
+npm run package
+```
+
+The application is generated in `release/mac-arm64/OpenPDF Studio.app` on Apple Silicon (or `release/mac/` on Intel). This is a local early release, not an Apple-notarized public distribution. No signing credentials are required for local builds. No files are installed in /Applications automatically.
+
+## What works
+
+- Native PDF open/save dialogs, recent documents, Finder open-file events, drag and drop.
+- Page thumbnails, page navigation, zoom, fit page/width, fullscreen, text selection/copy, text search, dark mode.
+- Standard PDF highlights, underline, strike-through, ink, rectangles, ellipses, arrows, text boxes, sticky notes. Select text while a markup tool is active; drag to draw; click to place a note or text box.
+- Annotation list, jump to annotated page, remove annotations.
+- Rotate, duplicate, delete, drag or button reorder, merge, extract ranges, split to separate PDFs.
+- Named document history with undo/redo; annotations and page operations restore actual PDF bytes.
+- Save, Save As, close confirmation, file-change conflict detection, atomic replacement of saved files.
+- Print the whole document (rasterized at 108 dpi in this first release).
+
+Use **Take a look around** to open an included four-page sample. It is a real, selectable PDF, generated locally.
+
+## Shortcuts
+
+| Shortcut | Action |
+| --- | --- |
+| ⌘O | Open PDF |
+| ⌘S / ⇧⌘S | Save / Save As |
+| ⌘W | Close document |
+| ⌘F | Search |
+| ⌘Z / ⇧⌘Z | Undo / redo |
+| ⌘+ / ⌘− / ⌘0 | Zoom in / out / fit page |
+| ⌘P | Print |
+| Left / right arrows | Previous / next page |
+| Escape | Return to selection tool |
+
+## Limits and cautions
+
+This is the first reader/organizer/annotation release, not full Acrobat parity. Existing text/image editing, OCR, scanner capture, form creation/filling, cryptographic signatures, Office conversion, compression and redaction are not implemented. Drawing over text does **not** redact it.
+
+- Inputs: PDF only, up to 50 MB and 500 pages. Password-protected PDFs are rejected.
+- History: at most 40 revisions, normally within 96 MB; at least the current and previous revisions are retained. Closing the document clears history.
+- Print: up to 100 pages; oversized pages are rejected. It prints rendered page images, not vector text.
+- Split export: at most 100 MB of combined output per operation.
+- Saving is a full PDF rewrite. It can invalidate digital signatures. Use Save As for signed or important originals. The app does not claim PDF/A, form, tagged-PDF, accessibility-tree, attachment, or complex interactive-feature preservation.
+- Notes remain editable PDF annotations. Text boxes are annotations; they do not modify underlying text.
+- Browser preview supports file selection and downloads for testing. Native filesystem and window features are desktop-only.
+- Recent document paths are stored locally in Electron's application data folder. PDF contents are not stored there. Theme preference is stored locally.
+
+## Architecture
+
+`electron/main.ts` owns native dialogs and file access. The isolated preload exposes an explicit API, not Node, paths, or arbitrary IPC. File handles are opaque and originate from user file selection. Renderer IPC validates its sending window/frame. Permission requests, new windows, webviews, external navigation, and production HTTP requests are blocked.
+
+`src/core/worker.ts` runs MuPDF WebAssembly in a worker in the sandboxed renderer. A readiness handshake waits for WebAssembly initialization. PDF JavaScript is disabled. `src/core/history.ts` stores immutable command revisions. PDF.js renders canvas and a selectable text layer without the scripting viewer.
+
+Generated PDF.js resources are copied as bytes, avoiding macOS clonefile stalls observed in a cloud-managed Documents folder. `out/renderer` is the production renderer; `dist-electron` contains the main/preload bundles.
+
+## Verify
+
+```sh
+npm test
+npm run build
+npm run test:desktop
+```
+
+Desktop tests launch actual Electron windows using Playwright, exercise the UI and real file services, and write temporary test PDFs. Native file-dialog selections are supplied by the test harness; no existing user files are modified. Screenshots and results are written to ignored `test-results/`.
+
+## License
+
+AGPL-3.0-only. MuPDF is used under its open-source AGPL license. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). No license fees, accounts, cloud services, or proprietary PDF SDKs are required by this build.

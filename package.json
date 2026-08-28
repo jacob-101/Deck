@@ -10,12 +10,13 @@
     "dev": "npm run resources && node scripts/dev.mjs",
     "dev:web": "npm run resources && vite --host 127.0.0.1",
     "build:electron": "node scripts/build-electron.mjs",
-    "build": "npm run resources && tsc --noEmit && vite build && npm run build:electron",
+    "build": "tsc --noEmit && vite build && node scripts/resources.mjs out/renderer/pdfjs && npm run build:electron",
     "test": "vitest run",
     "test:desktop": "node scripts/test-desktop.mjs",
     "start": "electron .",
     "package": "npm run build && electron-builder --mac --dir",
-    "resources": "node scripts/resources.mjs"
+    "resources": "node scripts/resources.mjs",
+    "format": "prettier --write src electron tests scripts vite.config.ts tsconfig.json"
   },
   "build": {
     "appId": "org.openpdf.studio",
@@ -24,7 +25,7 @@
       "output": "release"
     },
     "files": [
-      "dist/**/*",
+      "out/renderer/**/*",
       "dist-electron/**/*",
       "package.json",
       "LICENSE",
@@ -35,7 +36,8 @@
       "target": [
         "dmg"
       ],
-      "identity": null
+      "identity": null,
+      "icon": "build/icon.png"
     },
     "fileAssociations": [
       {
@@ -63,6 +65,7 @@
     "electron": "44.0.0",
     "electron-builder": "26.15.3",
     "esbuild": "0.28.2",
+    "prettier": "3.9.6",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
     "vite": "8.2.2",

@@ -1,18 +1,27 @@
-import { contextBridge, ipcRenderer } from 'electron';
-import type { DesktopAPI, OpenFile } from '../src/types';
+import { contextBridge, ipcRenderer } from "electron";
+import type { DesktopAPI, OpenFile } from "../src/types";
 const api: DesktopAPI = {
-  open: () => ipcRenderer.invoke('files:open'),
-  openRecent: id => ipcRenderer.invoke('files:recent', id),
-  recents: () => ipcRenderer.invoke('files:recents'),
-  save: (bytes, id, name, saveAs) => ipcRenderer.invoke('files:save', bytes, id, name, saveAs),
-  exportFiles: files => ipcRenderer.invoke('files:export', files),
-  setDirty: value => ipcRenderer.send('document:dirty', value),
-  confirmClose: () => ipcRenderer.invoke('document:confirm'),
-  closeWindow: () => ipcRenderer.send('window:close'),
-  fullscreen: () => ipcRenderer.send('window:fullscreen'),
-  print: () => ipcRenderer.send('window:print'),
-  ready: () => ipcRenderer.send('renderer:ready'),
-  onCommand: cb => { const listener = (_: unknown, command: string) => cb(command); ipcRenderer.on('menu:command', listener); return () => ipcRenderer.removeListener('menu:command', listener); },
-  onFile: cb => { const listener = (_: unknown, file: OpenFile) => cb(file); ipcRenderer.on('files:opened', listener); return () => ipcRenderer.removeListener('files:opened', listener); },
+  open: () => ipcRenderer.invoke("files:open"),
+  openRecent: (id) => ipcRenderer.invoke("files:recent", id),
+  recents: () => ipcRenderer.invoke("files:recents"),
+  save: (bytes, id, name, saveAs) =>
+    ipcRenderer.invoke("files:save", bytes, id, name, saveAs),
+  exportFiles: (files) => ipcRenderer.invoke("files:export", files),
+  setDirty: (value) => ipcRenderer.send("document:dirty", value),
+  confirmClose: () => ipcRenderer.invoke("document:confirm"),
+  closeWindow: () => ipcRenderer.send("window:close"),
+  fullscreen: () => ipcRenderer.send("window:fullscreen"),
+  print: () => ipcRenderer.send("window:print"),
+  ready: () => ipcRenderer.send("renderer:ready"),
+  onCommand: (cb) => {
+    const listener = (_: unknown, command: string) => cb(command);
+    ipcRenderer.on("menu:command", listener);
+    return () => ipcRenderer.removeListener("menu:command", listener);
+  },
+  onFile: (cb) => {
+    const listener = (_: unknown, file: OpenFile) => cb(file);
+    ipcRenderer.on("files:opened", listener);
+    return () => ipcRenderer.removeListener("files:opened", listener);
+  },
 };
-contextBridge.exposeInMainWorld('desktop', api);
+contextBridge.exposeInMainWorld("desktop", api);
