@@ -6,6 +6,7 @@ export type DesktopAPI = {
   open(): Promise<OpenFile | null>;
   openRecent(id: string): Promise<OpenFile>;
   recents(): Promise<RecentFile[]>;
+  clearRecents(): Promise<void>;
   save(
     bytes: Uint8Array,
     id: string | null,

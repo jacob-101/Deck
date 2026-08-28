@@ -2,6 +2,8 @@
 
 A local PDF workspace for macOS. No accounts, no uploads, no telemetry.
 
+**Version 0.2:** the Forest & Paper identity, a generated macOS icon, and a complete persistent Settings workspace.
+
 ## Run
 
 Requires Node.js 22.12+ and npm. On the first setup, dependency installation downloads Electron. PDF.js fonts, character maps, and MuPDF WebAssembly are bundled locally; opening and editing PDFs does not require a network connection.
@@ -39,6 +41,18 @@ The application is generated in `release/mac-arm64/OpenPDF Studio.app` on Apple 
 
 Use **Take a look around** to open an included four-page sample. It is a real, selectable PDF, generated locally.
 
+## Make it yours
+
+Open **OpenPDF Studio → Settings…** or press **⌘,**. Preferences save automatically on this Mac.
+
+- **General:** default page fit and whether the thumbnail sidebar opens with each PDF.
+- **Appearance:** Light, Dark, or System; Forest & Paper, Slate, Cobalt, or Clay palettes; reduced motion. System reduced-motion preferences are always respected.
+- **Annotations:** live color/line preview and working default color and line weight. Changes affect new marks, never existing annotations.
+- **Privacy:** clear recent-file history without deleting any PDFs. The packaged app blocks web requests and has no analytics.
+- **About:** version, open-source foundations, release limitations, and confirmed preference reset.
+
+Viewer defaults apply when opening a document. Appearance and annotation defaults update immediately. The original 0.1 light/dark preference migrates automatically. The icon source and generation prompt are in [brand/README.md](brand/README.md).
+
 ## Shortcuts
 
 | Shortcut | Action |
@@ -50,6 +64,7 @@ Use **Take a look around** to open an included four-page sample. It is a real, s
 | ⌘Z / ⇧⌘Z | Undo / redo |
 | ⌘+ / ⌘− / ⌘0 | Zoom in / out / fit page |
 | ⌘P | Print |
+| ⌘, | Settings |
 | Left / right arrows | Previous / next page |
 | Escape | Return to selection tool |
 
@@ -64,7 +79,7 @@ This is the first reader/organizer/annotation release, not full Acrobat parity. 
 - Saving is a full PDF rewrite. It can invalidate digital signatures. Use Save As for signed or important originals. The app does not claim PDF/A, form, tagged-PDF, accessibility-tree, attachment, or complex interactive-feature preservation.
 - Notes remain editable PDF annotations. Text boxes are annotations; they do not modify underlying text.
 - Browser preview supports file selection and downloads for testing. Native filesystem and window features are desktop-only.
-- Recent document paths are stored locally in Electron's application data folder. PDF contents are not stored there. Theme preference is stored locally.
+- Recent document paths are stored locally in Electron's application data folder. PDF contents are not stored there. Validated workspace preferences are stored locally in the renderer’s localStorage.
 
 ## Architecture
 

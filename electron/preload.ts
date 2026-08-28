@@ -4,6 +4,7 @@ const api: DesktopAPI = {
   open: () => ipcRenderer.invoke("files:open"),
   openRecent: (id) => ipcRenderer.invoke("files:recent", id),
   recents: () => ipcRenderer.invoke("files:recents"),
+  clearRecents: () => ipcRenderer.invoke("files:clear-recents"),
   save: (bytes, id, name, saveAs) =>
     ipcRenderer.invoke("files:save", bytes, id, name, saveAs),
   exportFiles: (files) => ipcRenderer.invoke("files:export", files),

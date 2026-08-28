@@ -17,7 +17,10 @@ const page = await app.firstWindow();
 const errors = [];
 page.on("pageerror", (error) => errors.push(error.message));
 page.on("console", (message) => {
-  if (message.type() === "error") console.log("RENDERER:", message.text());
+  if (message.type() === "error") {
+    errors.push(message.text());
+    console.log("RENDERER:", message.text());
+  }
 });
 const steps = [];
 const ready = () =>
@@ -32,7 +35,14 @@ try {
   await expect(
     page.getByRole("heading", { name: "Your PDFs. On your terms." }),
   ).toBeVisible();
-  await page.screenshot({ path: join(output, "welcome.png") });
+  await expect(page.locator(".product-icon").first()).toHaveJSProperty(
+    "naturalWidth",
+    256,
+  );
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "welcome.png"),
+  });
   steps.push("Desktop welcome screen");
   const security = await app.evaluate(({ BrowserWindow }) => {
     const prefs =
@@ -50,14 +60,119 @@ try {
   });
   expect(await page.evaluate(() => typeof window.require)).toBe("undefined");
   steps.push("Sandbox and narrow preload verified");
+  // Preferences are real persisted state; exercise native entry and live updates.
+  await app.evaluate(({ Menu }) => {
+    const menu = Menu.getApplicationMenu().items[0].submenu.items.find(
+      (item) => item.label === "Settings…",
+    );
+    if (!menu) throw new Error("Native Settings menu missing");
+    menu.click();
+  });
+  const settings = page.getByRole("dialog", { name: "Settings", exact: true });
+  await expect(settings).toBeVisible();
+  await settings.getByLabel("Default page view").selectOption("width");
+  await settings.getByRole("switch", { name: "Show the page sidebar" }).click();
+  await settings
+    .getByRole("button", { name: "Appearance", exact: true })
+    .click();
+  await settings.getByRole("button", { name: "System appearance" }).click();
+  await page.emulateMedia({ colorScheme: "dark" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page.emulateMedia({ colorScheme: "light" });
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await settings.getByRole("button", { name: "Light appearance" }).click();
+  await settings.getByRole("button", { name: "Cobalt palette" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "cobalt");
+  await settings.getByRole("switch", { name: "Reduce motion" }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-motion", "reduced");
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "settings-appearance.png"),
+  });
+  await settings
+    .getByRole("button", { name: "Annotations", exact: true })
+    .click();
+  await settings.getByRole("button", { name: "Blue annotation color" }).click();
+  await settings.getByLabel("Default line weight").selectOption("5");
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "settings-annotations.png"),
+  });
+  await settings.getByRole("button", { name: "Done", exact: true }).click();
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "cobalt");
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("openpdf:preferences:v1")),
+    ),
+  ).toMatchObject({
+    defaultFit: "width",
+    showSidebar: false,
+    annotationColor: "#719cd6",
+    strokeWidth: 5,
+  });
+  steps.push(
+    "Native Settings, system appearance, live palettes, reduced motion and reload persistence",
+  );
   await page.getByRole("button", { name: /Take a look around/ }).click();
   await ready();
   await noBusy();
   await expect(page.locator(".textLayer").last()).toContainText(
     "A little less friction.",
   );
-  await page.screenshot({ path: join(output, "reader.png") });
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "reader.png"),
+  });
   steps.push("Worker generated and rendered actual PDF with selectable text");
+  await expect(page.getByLabel("Page fit", { exact: true })).toHaveValue(
+    "width",
+  );
+  await expect(
+    page.getByRole("button", { name: "Show sidebar", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Annotate", exact: true }).click();
+  await expect(page.getByLabel("Stroke width", { exact: true })).toHaveValue(
+    "5",
+  );
+  await expect(
+    page.getByRole("button", { name: "Color #719cd6", exact: true }),
+  ).toHaveClass(/selected/);
+  steps.push(
+    "Saved viewer and annotation defaults applied to an actual document",
+  );
+  await page.getByRole("button", { name: "Rectangle", exact: true }).click();
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await settings.getByRole("button", { name: "About", exact: true }).click();
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "settings-about.png"),
+  });
+  await settings
+    .getByRole("button", { name: "Reset settings", exact: true })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "cobalt");
+  await settings
+    .getByRole("button", { name: "Confirm reset", exact: true })
+    .click();
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "forest");
+  await page.keyboard.press("Escape");
+  await expect(settings).not.toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Rectangle", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Read", exact: true }).click();
+  await page.getByRole("button", { name: "Show sidebar", exact: true }).click();
+  await page.getByLabel("Page fit", { exact: true }).selectOption("page");
+  await ready();
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "reader.png"),
+  });
+  steps.push(
+    "Confirmed reset and Escape return to the document without changing it",
+  );
+
   await page
     .getByRole("button", { name: "Search document", exact: true })
     .click();
@@ -140,7 +255,10 @@ try {
     "data-ready",
     "true",
   );
-  await page.screenshot({ path: join(output, "organizer.png") });
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "organizer.png"),
+  });
   steps.push("Rotate, duplicate, delete confirmation and reorder");
   const saved = join(temp, "saved.pdf");
   await app.evaluate(({ dialog }, path) => {
@@ -207,7 +325,10 @@ try {
   await ready();
   await page.getByRole("button", { name: "Use dark appearance" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
-  await page.screenshot({ path: join(output, "dark-reader.png") });
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "dark-reader.png"),
+  });
   steps.push("Dark mode");
   await app.evaluate(({ dialog }) => {
     dialog.showSaveDialog = async () => ({
@@ -247,6 +368,28 @@ try {
   await page.getByRole("button", { name: "Annotations", exact: true }).click();
   await expect(page.locator(".note-card")).toHaveCount(3);
   steps.push("Reopen saved PDF from recent files with annotations intact");
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  await settings.getByRole("button", { name: "Privacy", exact: true }).click();
+  await expect(settings).toContainText("2 documents in your recent list");
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "settings-privacy.png"),
+  });
+  await settings
+    .getByRole("button", { name: "Clear history", exact: true })
+    .click();
+  await expect(settings).toContainText("Recent history cleared");
+  expect(await page.evaluate(() => window.desktop.recents())).toEqual([]);
+  expect(
+    JSON.parse(
+      await readFile(join(temp, "profile", "recent-files.json"), "utf8"),
+    ),
+  ).toEqual([]);
+  expect((await readFile(saved)).length).toBeGreaterThan(0);
+  await settings.getByRole("button", { name: "Done", exact: true }).click();
+  steps.push(
+    "Privacy history clearing persists on disk and leaves PDF files intact",
+  );
   expect(errors).toEqual([]);
   await writeFile(
     join(output, "desktop-results.json"),
@@ -264,7 +407,9 @@ try {
       .catch(() => "unavailable"),
   );
   console.error("ERRORS:", errors);
-  await page.screenshot({ path: join(output, "failure.png") }).catch(() => {});
+  await page
+    .screenshot({ animations: "disabled", path: join(output, "failure.png") })
+    .catch(() => {});
   throw error;
 } finally {
   await app.evaluate(({ BrowserWindow }) =>

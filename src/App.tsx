@@ -39,6 +39,7 @@ import {
   Save,
   Scissors,
   Search,
+  Settings2,
   ShieldCheck,
   Square,
   Strikethrough,
@@ -63,6 +64,9 @@ import {
   type Tool,
 } from "./types";
 import { parsePageRange } from "./core/ranges";
+import { ANNOTATION_COLORS, usePreferences } from "./core/preferences";
+import { Settings, type SettingsSection } from "./components/Settings";
+import { APP_VERSION, BrandIcon } from "./components/Brand";
 GlobalWorkerOptions.workerSrc = workerUrl;
 
 const tools: {
@@ -132,14 +136,7 @@ const tools: {
     hint: "Click anywhere to leave a note.",
   },
 ];
-const colors = [
-  "#ddb542",
-  "#759783",
-  "#719cd6",
-  "#d17774",
-  "#997eb8",
-  "#252c2b",
-];
+const colors = ANNOTATION_COLORS;
 const download = (bytes: Uint8Array, name: string) => {
   const url = URL.createObjectURL(
     new Blob([bytes.slice().buffer], { type: "application/pdf" }),
@@ -156,20 +153,29 @@ type Modal =
 
 export default function App() {
   const state = useDocument();
+  const { values: preferences, update: updatePreferences } = usePreferences();
+  const [settings, setSettings] = useState<SettingsSection | null>(null);
+  const [systemDark, setSystemDark] = useState(
+    () => window.matchMedia("(prefers-color-scheme: dark)").matches,
+  );
+  const dark =
+    preferences.appearance === "system"
+      ? systemDark
+      : preferences.appearance === "dark";
   const revision = state.revisions[state.cursor];
   const dirty = !!revision && revision.id !== state.saved;
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [page, setPage] = useState(0);
   const [scaleMode, setScaleMode] = useState<"page" | "width" | "manual">(
-    "page",
+    preferences.defaultFit,
   );
   const [zoom, setZoom] = useState(1);
   const [area, setArea] = useState({ width: 900, height: 750 });
   const [mode, setMode] = useState<"read" | "annotate" | "organize">("read");
   const [tool, setTool] = useState<Tool>("select");
-  const [color, setColor] = useState(colors[0]);
-  const [stroke, setStroke] = useState(2);
-  const [sidebar, setSidebar] = useState(true);
+  const [color, setColor] = useState(preferences.annotationColor);
+  const [stroke, setStroke] = useState(preferences.strokeWidth);
+  const [sidebar, setSidebar] = useState(preferences.showSidebar);
   const [tab, setTab] = useState<"pages" | "search" | "notes">("pages");
   const [search, setSearch] = useState("");
   const [searching, setSearching] = useState(false);
@@ -182,9 +188,6 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [recents, setRecents] = useState<RecentFile[]>([]);
   const [dragging, setDragging] = useState(false);
-  const [dark, setDark] = useState(
-    () => localStorage.getItem("openpdf:theme") === "dark",
-  );
   const [modal, setModal] = useState<Modal | null>(null);
   const [input, setInput] = useState("");
   const [modalError, setModalError] = useState("");
@@ -239,8 +242,23 @@ export default function App() {
   };
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
-    localStorage.setItem("openpdf:theme", dark ? "dark" : "light");
-  }, [dark]);
+    document.documentElement.dataset.palette = preferences.theme;
+    document.documentElement.dataset.motion = preferences.reducedMotion
+      ? "reduced"
+      : "auto";
+  }, [dark, preferences.theme, preferences.reducedMotion]);
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const listener = () => setSystemDark(media.matches);
+    media.addEventListener("change", listener);
+    return () => media.removeEventListener("change", listener);
+  }, []);
+  useEffect(() => {
+    setColor(preferences.annotationColor);
+  }, [preferences.annotationColor]);
+  useEffect(() => {
+    setStroke(preferences.strokeWidth);
+  }, [preferences.strokeWidth]);
   useEffect(() => {
     window.desktop?.setDirty(dirty);
     document.title = revision
@@ -257,7 +275,7 @@ export default function App() {
       ?.recents()
       .then(setRecents)
       .catch(() => {});
-  }, [state.name]);
+  }, [state.name, settings]);
   useEffect(() => {
     if (!viewport.current) return;
     const observer = new ResizeObserver(([entry]) =>
@@ -390,14 +408,21 @@ export default function App() {
         : "cancel";
     return answer === "save" ? saveCurrent() : answer === "discard";
   };
-  const loadFile = async (file: OpenFile) => {
-    const result = await pdfEngine.inspect(file.bytes);
-    state.load(result.bytes, result.info, file.name, file.id);
+  const applyDocumentDefaults = () => {
+    const prefs = usePreferences.getState().values;
+    setScaleMode(prefs.defaultFit);
+    setSidebar(prefs.showSidebar);
     setPage(0);
     setSearch("");
     setMode("read");
     setTool("select");
     setTab("pages");
+  };
+  const loadFile = async (file: OpenFile) => {
+    const result = await pdfEngine.inspect(file.bytes);
+    state.load(result.bytes, result.info, file.name, file.id);
+    applyDocumentDefaults();
+    setSettings(null);
   };
   const chooseFile = (purpose: "open" | "merge" = "open") => {
     if (window.desktop)
@@ -488,6 +513,11 @@ export default function App() {
       return;
     }
     if (busyRef.current || modal) return;
+    if (name === "settings" || name === "about") {
+      setSettings(name === "about" ? "about" : "general");
+      return;
+    }
+    if (settings && name !== "save-and-close") return;
     switch (name) {
       case "open":
         chooseFile();
@@ -558,7 +588,7 @@ export default function App() {
         event.target instanceof HTMLElement &&
         !!event.target.closest('input, textarea, [contenteditable="true"]');
       if (event.key === "Escape") {
-        setTool("select");
+        if (!settings && !modal) setTool("select");
         return;
       }
       if (!window.desktop && (event.metaKey || event.ctrlKey)) {
@@ -569,6 +599,7 @@ export default function App() {
           return;
         const command = (
           {
+            ",": "settings",
             o: "open",
             s: event.shiftKey ? "save-as" : "save",
             f: "search",
@@ -585,7 +616,7 @@ export default function App() {
           event.preventDefault();
           commands.current(command);
         }
-      } else if (!input && !modal && !busyRef.current) {
+      } else if (!input && !modal && !settings && !busyRef.current) {
         if (event.key === "ArrowRight" || event.key === "PageDown")
           setPage((value) => Math.min(count - 1, value + 1));
         if (event.key === "ArrowLeft" || event.key === "PageUp")
@@ -594,7 +625,7 @@ export default function App() {
     };
     window.addEventListener("keydown", keydown);
     return () => window.removeEventListener("keydown", keydown);
-  }, [count, modal]);
+  }, [count, modal, settings]);
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
       if (dirty && !window.desktop) event.preventDefault();
@@ -708,6 +739,11 @@ export default function App() {
       }}
       onDrop={(event) => {
         if (!event.dataTransfer.files.length) return;
+        if (settings || modal) {
+          event.preventDefault();
+          setDragging(false);
+          return;
+        }
         event.preventDefault();
         setDragging(false);
         filePurpose.current = "open";
@@ -727,9 +763,7 @@ export default function App() {
       />
       <header className="titlebar">
         <div className="title-brand">
-          <div className="brand-mark">
-            <FileText size={18} />
-          </div>
+          <BrandIcon size={34} />
           <span>
             OpenPDF <b>Studio</b>
             <span className="version">BETA</span>
@@ -749,15 +783,14 @@ export default function App() {
         <div className="title-actions">
           <IconButton
             label={dark ? "Use light appearance" : "Use dark appearance"}
-            onClick={() => setDark(!dark)}
+            onClick={() =>
+              updatePreferences({ appearance: dark ? "light" : "dark" })
+            }
           >
             {dark ? <Sun size={16} /> : <Moon size={16} />}
           </IconButton>
-          <IconButton
-            label="About OpenPDF Studio"
-            onClick={() => setModal({ kind: "about" })}
-          >
-            <Info size={16} />
+          <IconButton label="Settings" onClick={() => setSettings("general")}>
+            <Settings2 size={17} />
           </IconButton>
         </div>
       </header>
@@ -874,7 +907,8 @@ export default function App() {
               >
                 <option value={1}>1 pt</option>
                 <option value={2}>2 pt</option>
-                <option value={4}>4 pt</option>
+                <option value={3}>3 pt</option>
+                <option value={5}>5 pt</option>
               </select>
               <span className="context-hint">
                 {tools.find((item) => item.id === tool)?.hint}
@@ -1366,9 +1400,12 @@ export default function App() {
         <main className="welcome">
           <div className="welcome-content">
             <div className="welcome-copy">
-              <span className="eyebrow">
-                <span className="status-dot" /> A LITTLE MORE ROOM TO WORK
-              </span>
+              <div className="welcome-identity">
+                <BrandIcon size={62} />
+                <span>
+                  OPENPDF STUDIO<small>A little more room to work.</small>
+                </span>
+              </div>
               <h1>
                 Your PDFs.
                 <br />
@@ -1398,7 +1435,7 @@ export default function App() {
                       "Field Notes.pdf",
                       null,
                     );
-                    setPage(0);
+                    applyDocumentDefaults();
                   })
                 }
               >
@@ -1506,12 +1543,24 @@ export default function App() {
             <div className="welcome-footer">
               <span>OPEN SOURCE. OPEN POSSIBILITIES.</span>
               <span>
-                Made for your Mac <span className="footer-dot">·</span> Version
-                0.1.0
+                Made for your Mac <span className="footer-dot">·</span> Version{" "}
+                {APP_VERSION}
               </span>
             </div>
           </div>
         </main>
+      )}
+      {settings && (
+        <Settings
+          key={settings}
+          initialSection={settings}
+          onClose={() => setSettings(null)}
+          recentCount={recents.length}
+          clearRecents={async () => {
+            await window.desktop?.clearRecents();
+            setRecents([]);
+          }}
+        />
       )}
       {busy && (
         <div className="busy-indicator" role="status">
@@ -1629,7 +1678,7 @@ export default function App() {
                 save without uploading your documents.
               </p>
               <div className="about-details">
-                <span>Version 0.1.0 · Early release</span>
+                <span>Version {APP_VERSION} · Early release</span>
                 <span>React · PDF.js · MuPDF · Electron</span>
                 <span>AGPL-3.0-only · No telemetry</span>
               </div>

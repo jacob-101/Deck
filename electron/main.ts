@@ -114,6 +114,12 @@ function registerIPC() {
     trusted(event);
     return recentFiles.map(({ id, name, date }) => ({ id, name, date }));
   });
+  ipcMain.handle("files:clear-recents", async (event) => {
+    trusted(event);
+    await writeJSON(recentsPath(), []);
+    recentFiles = [];
+    app.clearRecentDocuments();
+  });
   ipcMain.handle("files:recent", async (event, id: unknown) => {
     trusted(event);
     const entry = recentFiles.find((file) => file.id === id);
@@ -309,7 +315,9 @@ app.whenReady().then(async () => {
       {
         label: "OpenPDF Studio",
         submenu: [
-          { role: "about" },
+          item("About OpenPDF Studio", undefined, "about"),
+          { type: "separator" },
+          item("Settings…", "CmdOrCtrl+,", "settings"),
           { type: "separator" },
           { role: "hide" },
           { role: "hideOthers" },
