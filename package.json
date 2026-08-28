@@ -1,0 +1,27 @@
+{
+  "name": "openpdf-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A local PDF workspace for macOS",
+  "main": "dist-electron/main.cjs",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:web": "vite --host 127.0.0.1",
+    "build:electron": "node scripts/build-electron.mjs",
+    "build": "tsc --noEmit && vite build && npm run build:electron",
+    "test": "vitest run",
+    "test:desktop": "node scripts/test-desktop.mjs",
+    "start": "electron .",
+    "package": "npm run build && electron-builder --mac --dir"
+  },
+  "build": {
+    "appId": "org.openpdf.studio",
+    "productName": "OpenPDF Studio",
+    "directories": { "output": "release" },
+    "files": ["dist/**/*", "dist-electron/**/*", "package.json", "LICENSE", "THIRD_PARTY_NOTICES.md"],
+    "mac": { "category": "public.app-category.productivity", "target": ["dmg"], "identity": null },
+    "fileAssociations": [{ "ext": "pdf", "name": "PDF Document", "role": "Editor" }]
+  }
+}
