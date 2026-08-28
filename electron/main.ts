@@ -14,7 +14,15 @@ import { join, basename, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { readFile, mkdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { atomicSave, readPDF, stamp, validateBytes, writeJSON, writeText } from "./files";
+import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import {
+  atomicSave,
+  readPDF,
+  stamp,
+  validateBytes,
+  writeJSON,
+  writeText,
+} from "./files";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -39,6 +47,32 @@ type FileHandle = { path: string; stamp: string | null };
 type Recent = { id: string; path: string; name: string; date: number };
 const handles = new Map<string, FileHandle>();
 let recentFiles: Recent[] = [];
+const ocrProcesses = new Map<number, ChildProcessWithoutNullStreams>();
+function validOCRResult(value: unknown) {
+  if (!value || typeof value !== "object") return false;
+  const result = value as Record<string, unknown>;
+  if (
+    !Array.isArray(result.pages) ||
+    typeof result.markdown !== "string" ||
+    result.markdown.length > 10 * 1024 * 1024 ||
+    typeof result.processingTimeMs !== "number" ||
+    result.engine !== "Apple Vision"
+  )
+    return false;
+  let textLength = 0;
+  return result.pages.every((entry) => {
+    if (!entry || typeof entry !== "object") return false;
+    const page = entry as Record<string, unknown>;
+    if (typeof page.text === "string") textLength += page.text.length;
+    return (
+      Number.isInteger(page.page) &&
+      typeof page.text === "string" &&
+      typeof page.confidence === "number" &&
+      Number.isFinite(page.confidence) &&
+      textLength <= 10 * 1024 * 1024
+    );
+  });
+}
 const devURL = process.env.VITE_DEV_SERVER_URL;
 const trusted = (event: IpcMainInvokeEvent | IpcMainEvent) => {
   if (
@@ -158,6 +192,81 @@ function registerIPC() {
       return { id: nextId, name: basename(handle.path) };
     },
   );
+  ipcMain.handle(
+    "document:ocr",
+    async (event, bytes: unknown, pages: unknown, language: unknown) => {
+      trusted(event);
+      validateBytes(bytes);
+      if (
+        !Array.isArray(pages) ||
+        pages.length < 1 ||
+        pages.length > 100 ||
+        !pages.every(
+          (page) => Number.isInteger(page) && page >= 1 && page <= 500,
+        )
+      )
+        throw new Error("OCR supports 1–100 valid pages per run.");
+      const safeLanguage =
+        typeof language === "string" &&
+        /^(auto|[a-z]{2,3}(?:-[A-Za-z]{2,4})?)$/.test(language)
+          ? language
+          : "auto";
+      ocrProcesses.get(event.sender.id)?.kill("SIGTERM");
+      const executable = app.isPackaged
+        ? join(process.resourcesPath, "native", "openpdf-ocr")
+        : resolve("build", "native", "openpdf-ocr");
+      return new Promise((resolvePromise, reject) => {
+        const child = spawn(executable, [
+          "--pages",
+          pages.join(","),
+          "--language",
+          safeLanguage,
+        ]);
+        ocrProcesses.set(event.sender.id, child);
+        let stdout = Buffer.alloc(0);
+        let stderr = "";
+        const timeout = setTimeout(() => child.kill("SIGTERM"), 120000);
+        child.stdout.on("data", (chunk: Buffer) => {
+          stdout = Buffer.concat([stdout, chunk]);
+          if (stdout.length > 15 * 1024 * 1024) child.kill("SIGTERM");
+        });
+        child.stderr.on("data", (chunk: Buffer) => {
+          if (stderr.length < 4000) stderr += chunk.toString();
+        });
+        child.on("error", (cause) => reject(cause));
+        child.on("close", (code, signal) => {
+          clearTimeout(timeout);
+          if (ocrProcesses.get(event.sender.id) === child)
+            ocrProcesses.delete(event.sender.id);
+          if (code !== 0) {
+            reject(
+              new Error(
+                signal
+                  ? "OCR was cancelled."
+                  : stderr.trim() || "Offline OCR failed.",
+              ),
+            );
+            return;
+          }
+          try {
+            const result = JSON.parse(stdout.toString("utf8"));
+            if (!validOCRResult(result))
+              throw new Error("Offline OCR returned an invalid result.");
+            resolvePromise(result);
+          } catch {
+            reject(new Error("Offline OCR returned an invalid result."));
+          }
+        });
+        child.stdin.on("error", () => {});
+        child.stdin.end(Buffer.from(bytes));
+      });
+    },
+  );
+  ipcMain.on("document:ocr-cancel", (event) => {
+    trusted(event);
+    ocrProcesses.get(event.sender.id)?.kill("SIGTERM");
+    ocrProcesses.delete(event.sender.id);
+  });
   ipcMain.handle("files:export", async (event, files: unknown) => {
     trusted(event);
     if (!Array.isArray(files) || !files.length || files.length > 500)

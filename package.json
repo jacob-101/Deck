@@ -10,7 +10,8 @@
     "dev": "npm run resources && node scripts/dev.mjs",
     "dev:web": "npm run resources && vite --host 127.0.0.1",
     "build:electron": "node scripts/build-electron.mjs",
-    "build": "tsc --noEmit && vite build && node scripts/resources.mjs out/renderer/pdfjs && npm run build:electron",
+    "build:native": "node scripts/build-native.mjs",
+    "build": "npm run build:native && tsc --noEmit && vite build && node scripts/resources.mjs out/renderer/pdfjs && npm run build:electron",
     "test": "vitest run",
     "test:desktop": "node scripts/test-desktop.mjs",
     "start": "electron .",
@@ -30,6 +31,12 @@
       "package.json",
       "LICENSE",
       "THIRD_PARTY_NOTICES.md"
+    ],
+    "extraResources": [
+      {
+        "from": "build/native/openpdf-ocr",
+        "to": "native/openpdf-ocr"
+      }
     ],
     "mac": {
       "category": "public.app-category.productivity",

@@ -2,6 +2,12 @@ export const MAX_FILE_SIZE = 50 * 1024 * 1024;
 export type OpenFile = { id: string | null; name: string; bytes: Uint8Array };
 export type RecentFile = { id: string; name: string; date: number };
 export type SaveResult = { id: string; name: string } | null;
+export type OCRResult = {
+  pages: { page: number; text: string; confidence: number }[];
+  markdown: string;
+  processingTimeMs: number;
+  engine: string;
+};
 export type DesktopAPI = {
   open(): Promise<OpenFile | null>;
   openRecent(id: string): Promise<OpenFile>;
@@ -15,6 +21,12 @@ export type DesktopAPI = {
   ): Promise<SaveResult>;
   exportFiles(files: { name: string; bytes: Uint8Array }[]): Promise<boolean>;
   exportMarkdown(markdown: string, name: string): Promise<boolean>;
+  runOCR(
+    bytes: Uint8Array,
+    pages: number[],
+    language: string,
+  ): Promise<OCRResult>;
+  cancelOCR(): void;
   setDirty(value: boolean): void;
   confirmClose(): Promise<"save" | "discard" | "cancel">;
   closeWindow(): void;

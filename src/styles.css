@@ -599,6 +599,9 @@ button {
 .analysis-summary strong { font-size: 18px; }
 .analysis-summary span, .analysis-caveat { color: var(--muted); font-size: 13px; }
 .markdown-preview { max-height: 230px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0 14px; padding: 14px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); font: 12px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.ocr-controls { display: flex; align-items: end; flex-wrap: wrap; gap: 9px; margin: 14px 0; padding: 14px; border: 1px solid var(--line); border-radius: 10px; }
+.ocr-controls label { display: flex; flex-direction: column; gap: 5px; min-width: 180px; font-size: 12px; color: var(--muted); }
+.ocr-controls select { min-height: 34px; }
 .spinner {
   display: inline-block;
   width: 16px;

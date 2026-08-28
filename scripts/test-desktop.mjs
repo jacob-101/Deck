@@ -4,6 +4,49 @@ import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import * as mupdf from "mupdf";
 
+function createScannedPDF() {
+  const source = new mupdf.PDFDocument();
+  const font = new mupdf.Font("Helvetica");
+  const fontRef = source.addSimpleFont(font);
+  const sourcePageRef = source.addPage(
+    [0, 0, 612, 792],
+    0,
+    { Font: { F1: fontRef } },
+    "BT /F1 34 Tf 72 650 Td (SCANNED INVOICE 2026) Tj 0 -65 Td /F1 20 Tf (Total: 125.00) Tj ET",
+  );
+  source.insertPage(-1, sourcePageRef);
+  const sourcePage = source.loadPage(0);
+  const pixmap = sourcePage.toPixmap(
+    [2, 0, 0, 2, 0, 0],
+    mupdf.ColorSpace.DeviceRGB,
+    false,
+  );
+  const image = new mupdf.Image(pixmap);
+  const scanned = new mupdf.PDFDocument();
+  const imageRef = scanned.addImage(image);
+  const scannedPage = scanned.addPage(
+    [0, 0, 612, 792],
+    0,
+    { XObject: { Im0: imageRef } },
+    "q 612 0 0 792 0 0 cm /Im0 Do Q",
+  );
+  scanned.insertPage(-1, scannedPage);
+  const buffer = scanned.saveToBuffer("garbage=4,compress");
+  const bytes = buffer.asUint8Array().slice();
+  buffer.destroy();
+  scannedPage.destroy();
+  imageRef.destroy();
+  image.destroy();
+  pixmap.destroy();
+  sourcePage.destroy();
+  sourcePageRef.destroy();
+  fontRef.destroy();
+  font.destroy();
+  scanned.destroy();
+  source.destroy();
+  return bytes;
+}
+
 const output = resolve("test-results");
 await mkdir(output, { recursive: true });
 const temp = await mkdtemp(join(tmpdir(), "openpdf-desktop-"));
@@ -129,20 +172,42 @@ try {
   await app.evaluate(({ dialog }, path) => {
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: path });
   }, markdown);
-  await page.getByRole("button", { name: "Analyze document", exact: true }).click();
-  const analysis = page.getByRole("dialog", { name: "Document analysis", exact: true });
+  await page
+    .getByRole("button", { name: "Analyze document", exact: true })
+    .click();
+  const analysis = page.getByRole("dialog", {
+    name: "Document analysis",
+    exact: true,
+  });
   await expect(analysis).toBeVisible();
   await expect(analysis).toContainText("Text-based PDF", { timeout: 30000 });
   await expect(analysis.locator("#markdown-preview")).toContainText(
     "A little less friction",
   );
-  await analysis.getByRole("button", { name: "Export Markdown", exact: true }).click();
+  await analysis
+    .getByRole("button", { name: "Run Offline OCR", exact: true })
+    .click();
+  await expect(analysis).toContainText("Apple Vision OCR complete", {
+    timeout: 120000,
+  });
+  await expect(analysis.locator("#markdown-preview")).toContainText(
+    "A little less friction",
+  );
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "document-ocr.png"),
+  });
+  await analysis
+    .getByRole("button", { name: "Export Markdown", exact: true })
+    .click();
   await expect(analysis).toContainText("Markdown exported");
   await expect(readFile(markdown, "utf8")).resolves.toContain(
     "A little less friction",
   );
   await analysis.getByRole("button", { name: "Done", exact: true }).click();
-  steps.push("Local document classification and native Markdown export");
+  steps.push(
+    "Local document classification, Apple Vision OCR, and native Markdown export",
+  );
   await expect(page.getByLabel("Page fit", { exact: true })).toHaveValue(
     "width",
   );
@@ -407,20 +472,32 @@ try {
   await textModal.getByLabel("Font size").selectOption("18");
   await textModal.getByLabel("Font family").selectOption("Cour");
   await textModal.getByRole("button", { name: "Charcoal" }).click();
-  await textModal.getByLabel("Annotation text").fill("Café Approval — 100€\nReviewed & Accepted ©");
-  await textModal.getByRole("button", { name: "Add to document", exact: true }).click();
+  await textModal
+    .getByLabel("Annotation text")
+    .fill("Café Approval — 100€\nReviewed & Accepted ©");
+  await textModal
+    .getByRole("button", { name: "Add to document", exact: true })
+    .click();
   await noBusy();
   await ready();
   await expect(page.locator(".note-card")).toHaveCount(4);
-  await expect(page.locator(".note-card").last()).toContainText("Café Approval — 100€");
+  await expect(page.locator(".note-card").last()).toContainText(
+    "Café Approval — 100€",
+  );
 
   // Move Text Box via page interaction
-  const freeTextHandle = page.locator('.annotation-interaction-layer div[role="button"][aria-label*="FreeText"]');
+  const freeTextHandle = page.locator(
+    '.annotation-interaction-layer div[role="button"][aria-label*="FreeText"]',
+  );
   await expect(freeTextHandle).toBeVisible();
   const ftBox = await freeTextHandle.boundingBox();
   await page.mouse.move(ftBox.x + ftBox.width / 2, ftBox.y + ftBox.height / 2);
   await page.mouse.down();
-  await page.mouse.move(ftBox.x + ftBox.width / 2 + 30, ftBox.y + ftBox.height / 2 + 20, { steps: 8 });
+  await page.mouse.move(
+    ftBox.x + ftBox.width / 2 + 30,
+    ftBox.y + ftBox.height / 2 + 20,
+    { steps: 8 },
+  );
   await page.mouse.up();
   await noBusy();
   await ready();
@@ -428,7 +505,9 @@ try {
   await ready();
   await page.getByRole("button", { name: "Redo", exact: true }).click();
   await ready();
-  steps.push("Add text with custom font size, Courier family, Unicode/multiline text, and move interaction");
+  steps.push(
+    "Add text with custom font size, Courier family, Unicode/multiline text, and move interaction",
+  );
 
   // Signature workflow (Sign / Stamp)
   await page.getByRole("button", { name: "Sign", exact: true }).click();
@@ -466,9 +545,9 @@ try {
   await signatureModal
     .getByRole("button", { name: "Delete saved signature", exact: true })
     .click();
-  await expect(signatureModal.getByRole("button", { name: "Draw" })).toHaveClass(
-    /active/,
-  );
+  await expect(
+    signatureModal.getByRole("button", { name: "Draw" }),
+  ).toHaveClass(/active/);
   await signatureModal.getByRole("button", { name: "Cancel" }).click();
   steps.push(
     "Sign workflow with typed signature, persistence opt-in, placement, and saved signature deletion",
@@ -636,6 +715,36 @@ try {
   steps.push(
     "Privacy history clearing persists on disk and leaves PDF files intact",
   );
+  const scanned = join(temp, "scanned.pdf");
+  await writeFile(scanned, createScannedPDF());
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showOpenDialog = async () => ({
+      canceled: false,
+      filePaths: [path],
+    });
+  }, scanned);
+  await page.getByRole("button", { name: "Open", exact: true }).click();
+  await noBusy();
+  await ready();
+  await page
+    .getByRole("button", { name: "Analyze document", exact: true })
+    .click();
+  await expect(analysis).toContainText(/scanned PDF|Image-based PDF/, {
+    timeout: 30000,
+  });
+  await analysis.getByRole("button", { name: /Run Offline OCR/ }).click();
+  await expect(analysis).toContainText("Apple Vision OCR complete", {
+    timeout: 120000,
+  });
+  await expect(analysis.locator("#markdown-preview")).toContainText(
+    "SCANNED INVOICE 2026",
+  );
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "scanned-pdf-ocr.png"),
+  });
+  await analysis.getByRole("button", { name: "Done", exact: true }).click();
+  steps.push("Scanned image-only PDF detection and offline OCR recognition");
   expect(errors).toEqual([]);
   await writeFile(
     join(output, "desktop-results.json"),

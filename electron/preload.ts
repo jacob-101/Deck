@@ -10,6 +10,9 @@ const api: DesktopAPI = {
   exportFiles: (files) => ipcRenderer.invoke("files:export", files),
   exportMarkdown: (markdown, name) =>
     ipcRenderer.invoke("files:export-markdown", markdown, name),
+  runOCR: (bytes, pages, language) =>
+    ipcRenderer.invoke("document:ocr", bytes, pages, language),
+  cancelOCR: () => ipcRenderer.send("document:ocr-cancel"),
   setDirty: (value) => ipcRenderer.send("document:dirty", value),
   confirmClose: () => ipcRenderer.invoke("document:confirm"),
   closeWindow: () => ipcRenderer.send("window:close"),

@@ -7,4 +7,5 @@ release/
 .gstack/
 .DS_Store
 test-results/
+build/native/
 *.log
