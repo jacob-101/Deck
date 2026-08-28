@@ -361,6 +361,83 @@ try {
   await expect(page.locator(".note-card")).toHaveCount(3);
   await expect(page.locator(".note-card").last()).toContainText("Highlight");
   steps.push("Real text selection creates a persistent highlight");
+
+  // Add Text (FreeText) workflow
+  await page.getByRole("button", { name: "Text box", exact: true }).click();
+  box = await page.locator(".page-stage .pdf-page").boundingBox();
+  await page.mouse.click(box.x + 200, box.y + 160);
+  const textModal = page.getByRole("dialog");
+  await expect(textModal).toBeVisible();
+  await textModal.getByLabel("Font size").selectOption("18");
+  await textModal.getByLabel("Font family").selectOption("Cour");
+  await textModal.getByRole("button", { name: "Charcoal" }).click();
+  await textModal.getByLabel("Annotation text").fill("Café Approval — 100€\nReviewed & Accepted ©");
+  await textModal.getByRole("button", { name: "Add to document", exact: true }).click();
+  await noBusy();
+  await ready();
+  await expect(page.locator(".note-card")).toHaveCount(4);
+  await expect(page.locator(".note-card").last()).toContainText("Café Approval — 100€");
+
+  // Move Text Box via page interaction
+  const freeTextHandle = page.locator('.annotation-interaction-layer div[role="button"][aria-label*="FreeText"]');
+  await expect(freeTextHandle).toBeVisible();
+  const ftBox = await freeTextHandle.boundingBox();
+  await page.mouse.move(ftBox.x + ftBox.width / 2, ftBox.y + ftBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(ftBox.x + ftBox.width / 2 + 30, ftBox.y + ftBox.height / 2 + 20, { steps: 8 });
+  await page.mouse.up();
+  await noBusy();
+  await ready();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await ready();
+  await page.getByRole("button", { name: "Redo", exact: true }).click();
+  await ready();
+  steps.push("Add text with custom font size, Courier family, Unicode/multiline text, and move interaction");
+
+  // Signature workflow (Sign / Stamp)
+  await page.getByRole("button", { name: "Sign", exact: true }).click();
+  const signatureModal = page.getByRole("dialog", {
+    name: "Signature creation and placement",
+  });
+  await expect(signatureModal).toBeVisible();
+  // Type signature tab
+  await signatureModal
+    .getByRole("button", { name: "Type", exact: true })
+    .click();
+  await signatureModal.getByLabel("Full name or initials").fill("Jane Doe");
+  await signatureModal
+    .getByRole("checkbox", {
+      name: "Save signature for future use (stored locally on this Mac)",
+    })
+    .check();
+  await signatureModal
+    .getByRole("button", { name: "Place Signature", exact: true })
+    .click();
+  await noBusy();
+  await ready();
+  await expect(page.locator(".note-card")).toHaveCount(5);
+  await expect(page.locator(".note-card").last()).toContainText("Signature");
+
+  // Reopen Signature Modal and verify saved signature persistence
+  await page.getByRole("button", { name: "Sign", exact: true }).click();
+  await expect(signatureModal).toBeVisible();
+  await expect(
+    signatureModal.getByRole("button", { name: /Saved/ }),
+  ).toBeVisible();
+  await expect(signatureModal.getByText("Jane Doe")).toBeVisible();
+
+  // Delete saved signature
+  await signatureModal
+    .getByRole("button", { name: "Delete saved signature", exact: true })
+    .click();
+  await expect(signatureModal.getByRole("button", { name: "Draw" })).toHaveClass(
+    /active/,
+  );
+  await signatureModal.getByRole("button", { name: "Cancel" }).click();
+  steps.push(
+    "Sign workflow with typed signature, persistence opt-in, placement, and saved signature deletion",
+  );
+
   await page.getByRole("button", { name: "Organize", exact: true }).click();
   await page.getByRole("button", { name: "Rotate", exact: true }).click();
   await noBusy();
@@ -401,6 +478,11 @@ try {
   expect(annots.map((annotation) => annotation.getContents())).toContain(
     "Edited: this note stays inside the saved PDF.",
   );
+  expect(annots.map((annotation) => annotation.getContents())).toContain(
+    "Café Approval — 100€\nReviewed & Accepted ©",
+  );
+  const stampAnnot = annots.find((a) => a.getType() === "Stamp");
+  expect(stampAnnot).toBeDefined();
   expect(annots[0].getColor()[2]).toBeCloseTo(214 / 255);
   expect(annots[1].getBorderWidth()).toBe(5);
   annots.forEach((annotation) => annotation.destroy());
@@ -494,7 +576,7 @@ try {
   await noBusy();
   await ready();
   await page.getByRole("button", { name: "Annotations", exact: true }).click();
-  await expect(page.locator(".note-card")).toHaveCount(3);
+  await expect(page.locator(".note-card")).toHaveCount(5);
   steps.push("Reopen saved PDF from recent files with annotations intact");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await settings.getByRole("button", { name: "Privacy", exact: true }).click();

@@ -38,7 +38,8 @@ export type Tool =
   | "Circle"
   | "Line"
   | "FreeText"
-  | "Text";
+  | "Text"
+  | "Stamp";
 export type AnnotationInput = {
   type: Exclude<Tool, "select">;
   rect: number[];
@@ -47,6 +48,9 @@ export type AnnotationInput = {
   contents?: string;
   points?: number[][];
   quads?: number[][];
+  fontSize?: number;
+  font?: string;
+  imageBytes?: Uint8Array;
 };
 export type AnnotationInfo = {
   id: number;
@@ -56,11 +60,17 @@ export type AnnotationInfo = {
   width: number | null;
   editable: boolean;
   locked: boolean;
+  fontSize?: number | null;
+  font?: string | null;
+  rect?: number[];
 };
 export type AnnotationPatch = {
   contents?: string;
   color?: number[];
   width?: number;
+  fontSize?: number;
+  font?: string;
+  rect?: number[];
 };
 export type PageInfo = {
   width: number;

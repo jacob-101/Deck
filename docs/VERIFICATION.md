@@ -3,12 +3,15 @@
 ## Passed
 
 - TypeScript check and Vite/Electron production build.
-- 28 unit tests against real MuPDF documents and actual temporary files.
-- 23 Electron desktop scenarios, run against both the source build and the packaged Apple Silicon `.app`.
+- 34 unit tests against real MuPDF documents, preferences storage error handling, and actual temporary files.
+- 25 Electron desktop scenarios, run against both the source build and the packaged Apple Silicon `.app`.
+- Full verification of Add Text (FreeText) with custom font sizes, font families (`Helv`, `Cour`), text colors, multiline/Unicode text (`Café Approval — 100€ ©`), interactive move/resize bounding box on page canvas, and undo/redo.
+- Full verification of Sign (Stamp) workflow across Draw, Type, and Import modes, aspect-ratio preserved corner resizing, opt-in local storage error handling, deletion controls, image format/pixel limits (PNG/JPEG, max 5 MB / 4096px), and persistent rendering in saved PDFs without fallback stamps.
+- MuPDF `setRect` restriction verification: confirmed `setRect()` is safely executed on `FreeText`, `Stamp`, `Square`, `Circle`, and `Text` annotations while guarded against unsupported stroke annotations (`Line`, `Ink`, `Highlight`, etc.).
 - Gstack browser verification at 980 × 650: sample PDF opened, rendered with selectable text, interactive controls present, no browser console errors. Version 0.2 Settings and welcome layouts also checked at the minimum size.
 - Visual inspection of welcome, reader, organizer, and minimum-window screenshots.
 
-Desktop scenarios: launch; sandbox/preload settings; worker initialization and real PDF rendering; document search and navigation; note placement; drawing and undo/redo; mouse-selected text highlighting; page rotate/duplicate/delete/reorder; native save and annotation persistence; extraction; split; merge; dark mode; canceled Save As; canceled close; recent-file reopen with annotations intact.
+Desktop scenarios: launch; sandbox/preload settings; worker initialization and real PDF rendering; document search and navigation; note placement; drawing and undo/redo; mouse-selected text highlighting; Add Text with custom font/size/color and interactive move; Sign workflow with typed signature, persistence opt-in, placement, and saved signature deletion; page rotate/duplicate/delete/reorder; native save and annotation persistence; extraction; split; merge; dark mode; canceled Save As; canceled close; recent-file reopen with annotations intact.
 
 Filesystem tests check atomic replacement and refusal to overwrite an externally modified original. PDF tests include all nine annotation types, rotated-page annotation coordinates, independent page duplication, preserved notes during copy/merge, invalid ranges, protected-file rejection, and history save-state correctness.
 
@@ -24,18 +27,20 @@ The desktop harness supplies native dialog choices but calls the real preload, I
 - Validation rejects unsupported preference values, tolerates damaged/unavailable storage, and migrates the original light/dark preference.
 - Final packaged-app run: 20 scenarios passed, zero renderer errors. Unit suite: 22 passed.
 
-## Version 0.3 reader and annotation checks
+## Version 0.3 reader, text, and signing checks
 
-- Final production build, 28 unit tests, and 23 packaged Electron scenarios passed with zero renderer errors.
+- Final production build, 34 unit tests, and 25 packaged Electron scenarios passed with zero renderer errors.
 - Existing note text/color and shape line weight/comments update in the PDF, survive native Save and reopening, and restore through undo/redo. Empty text is rejected; canceling a draft leaves the document unchanged.
-- FreeText changes preserve its font size and rectangle; edits leave underlying page text intact. Locked annotations reject edits and deletion.
+- FreeText text boxes support font size (10–32 pt), font family (`Helv`, `Cour`, `Times`), dedicated text colors, multiline/Unicode text, interactive repositioning and resizing on the page stage, with underlying page text and graphics preserved.
+- Sign workflow provides drawn, typed, and imported visible signatures with background transparency removal, proportional corner resizing, local opt-in storage, and deletion controls.
+- MuPDF `updateAnnotation` explicitly protects against invalid `setRect()` calls on non-rectangular geometries.
 - Embedded contents navigate to real pages and keep correct destinations after page reordering. HTTP links and actual external GoToR actions are non-navigable. PDFs without an outline remain supported.
 - Native File → Document Details and browser ⌘I open the metadata dialog. Page shortcuts do not navigate the background document while it is open.
 - Gstack checked the contents/details flow and annotation editor at 980 × 650; console clean. Details remain scrollable at the minimum window height.
 
 ## Packaging
 
-`release/mac-arm64/OpenPDF Studio.app`, Electron 44.0.0, macOS arm64. Version 0.3.0. Local unsigned distribution. No upload or public release performed.
+`release/mac-arm64/OpenPDF Studio.app`, Electron 44.0.0, macOS arm64. Version 0.3.0. Local unsigned distribution. Tested with real Electron test suite (`25 passed, 0 errors`). No upload or public release performed.
 
 ## Not verified
 

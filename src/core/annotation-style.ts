@@ -21,6 +21,7 @@ export function annotationHex(color: number[]): string {
       .join("")
   );
 }
+
 export const annotationName = (type: string) =>
   ({
     Text: "Sticky note",
@@ -30,4 +31,5 @@ export const annotationName = (type: string) =>
     Line: "Arrow / line",
     Ink: "Drawing",
     StrikeOut: "Strike through",
+    Stamp: "Signature / Stamp",
   })[type] ?? type;

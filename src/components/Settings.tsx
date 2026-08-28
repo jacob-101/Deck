@@ -18,6 +18,8 @@ import {
 import {
   ANNOTATION_COLORS,
   COLOR_NAMES,
+  TEXT_COLORS,
+  TEXT_COLOR_NAMES,
   THEMES,
   usePreferences,
 } from "../core/preferences";
@@ -390,6 +392,61 @@ export function Settings({
                         </option>
                       ))}
                     </select>
+                  </Row>
+                  <Row
+                    title="Default text color"
+                    detail="Starting color when adding new text boxes."
+                  >
+                    <div className="settings-color-options">
+                      {TEXT_COLORS.map((color, i) => (
+                        <button
+                          key={color}
+                          aria-label={`${TEXT_COLOR_NAMES[i]} text color`}
+                          aria-pressed={values.defaultTextColor === color}
+                          style={{ background: color }}
+                          onClick={() => update({ defaultTextColor: color })}
+                        >
+                          {values.defaultTextColor === color && (
+                            <Check size={13} />
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </Row>
+                  <Row
+                    title="Default text size"
+                    detail="Starting font size for new text boxes."
+                  >
+                    <select
+                      aria-label="Default text size"
+                      value={values.defaultFontSize}
+                      onChange={(e) =>
+                        update({ defaultFontSize: Number(e.target.value) })
+                      }
+                    >
+                      {[10, 12, 14, 16, 18, 24, 32].map((sz) => (
+                        <option key={sz} value={sz}>
+                          {sz} pt{sz === 14 ? " · Default" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </Row>
+                  <Row
+                    title="Text box outline"
+                    detail="Draw a subtle border box around added text (off by default for clean text)."
+                  >
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={values.textBackground}
+                      aria-label="Draw a subtle border box around added text"
+                      className={`switch ${values.textBackground ? "active" : ""}`}
+                      onClick={() =>
+                        update({ textBackground: !values.textBackground })
+                      }
+                    >
+                      <span className="switch-thumb" />
+                    </button>
                   </Row>
                 </div>
                 <div className="settings-callout">

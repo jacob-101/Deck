@@ -18,6 +18,7 @@ const editableTypes = new Set([
   "Underline",
   "StrikeOut",
   "Ink",
+  "Stamp",
 ]);
 function annotationLocked(annotation: mupdf.PDFAnnotation) {
   return !!(
@@ -138,22 +139,33 @@ export function inspect(bytes: Uint8Array): DocumentInfo {
             width: bounds[2] - bounds[0],
             height: bounds[3] - bounds[1],
             rotation: rotate.asNumber() || 0,
-            annotations: annots.map((annotation, id) => ({
-              id,
-              type: annotation.getType(),
-              contents: annotation.getContents(),
-              color:
-                annotation.getType() === "FreeText"
-                  ? annotation.getDefaultAppearance().color
+            annotations: annots.map((annotation, id) => {
+              const isFreeText = annotation.getType() === "FreeText";
+              const appearance = isFreeText
+                ? annotation.getDefaultAppearance()
+                : null;
+              const rect = annotation.hasRect()
+                ? annotation.getRect()
+                : [0, 0, 0, 0];
+              return {
+                id,
+                type: annotation.getType(),
+                contents: annotation.getContents(),
+                color: isFreeText
+                  ? appearance!.color
                   : annotation.getColor(),
-              width: annotation.hasBorder()
-                ? annotation.getBorderWidth()
-                : null,
-              editable:
-                editableTypes.has(annotation.getType()) &&
-                !annotationLocked(annotation),
-              locked: annotationLocked(annotation),
-            })),
+                fontSize: isFreeText ? appearance!.size : null,
+                font: isFreeText ? appearance!.font : null,
+                rect: [rect[0], rect[1], rect[2], rect[3]],
+                width: annotation.hasBorder()
+                  ? annotation.getBorderWidth()
+                  : null,
+                editable:
+                  editableTypes.has(annotation.getType()) &&
+                  !annotationLocked(annotation),
+                locked: annotationLocked(annotation),
+              };
+            }),
           };
         } finally {
           for (const annotation of annots) annotation.destroy();
@@ -182,7 +194,10 @@ function updateAnnotation(
     Array.isArray(patch) ||
     !Object.keys(patch).length ||
     Object.keys(patch).some(
-      (key) => !["contents", "color", "width"].includes(key),
+      (key) =>
+        !["contents", "color", "width", "fontSize", "font", "rect"].includes(
+          key,
+        ),
     )
   )
     throw new Error("No annotation changes supplied.");
@@ -207,16 +222,50 @@ function updateAnnotation(
       !annotation.hasBorder())
   )
     throw new Error("Choose a line weight between 0 and 20 pt.");
+  if (
+    patch.fontSize !== undefined &&
+    (!Number.isFinite(patch.fontSize) ||
+      patch.fontSize < 6 ||
+      patch.fontSize > 144)
+  )
+    throw new Error("Choose a font size between 6 and 144 pt.");
+  if (
+    patch.rect !== undefined &&
+    (!Array.isArray(patch.rect) ||
+      patch.rect.length !== 4 ||
+      !patch.rect.every(Number.isFinite))
+  )
+    throw new Error("Invalid annotation position.");
+
   if (patch.contents !== undefined) annotation.setContents(patch.contents);
-  if (patch.color !== undefined) {
+  if (
+    patch.color !== undefined ||
+    patch.fontSize !== undefined ||
+    patch.font !== undefined
+  ) {
     if (type === "FreeText") {
       const appearance = annotation.getDefaultAppearance();
       annotation.setDefaultAppearance(
-        appearance.font,
-        appearance.size,
-        patch.color as mupdf.AnnotColor,
+        patch.font ?? appearance.font,
+        patch.fontSize ?? appearance.size,
+        (patch.color ?? appearance.color) as mupdf.AnnotColor,
       );
-    } else annotation.setColor(patch.color as mupdf.AnnotColor);
+    } else if (patch.color !== undefined) {
+      annotation.setColor(patch.color as mupdf.AnnotColor);
+    }
+  }
+  if (patch.rect !== undefined) {
+    if (
+      type === "FreeText" ||
+      type === "Stamp" ||
+      type === "Square" ||
+      type === "Circle" ||
+      type === "Text"
+    ) {
+      annotation.setRect(patch.rect as mupdf.Rect);
+    } else {
+      throw new Error(`Repositioning ${type} annotations is not supported.`);
+    }
   }
   if (patch.width !== undefined) annotation.setBorderWidth(patch.width);
   annotation.setModificationDate(new Date());
@@ -232,11 +281,28 @@ function addAnnotation(page: mupdf.PDFPage, input: AnnotationInput) {
     throw new Error("Invalid annotation coordinates.");
   const annotation = page.createAnnotation(input.type);
   try {
-    annotation.setColor(input.color as mupdf.AnnotColor);
+    if (input.type !== "FreeText" || (input.width !== undefined && input.width > 0)) {
+      annotation.setColor(input.color as mupdf.AnnotColor);
+    }
     annotation.setFlags(mupdf.PDFAnnotation.IS_PRINT);
     annotation.setCreationDate(new Date());
-    if (annotation.hasBorder())
+    if (input.type === "FreeText") {
+      const fontName = input.font || "Helv";
+      const fontSize = Math.max(6, Math.min(144, input.fontSize || 14));
+      annotation.setDefaultAppearance(
+        fontName,
+        fontSize,
+        input.color as mupdf.AnnotColor,
+      );
+      annotation.setRect(input.rect as mupdf.Rect);
+      if (input.width !== undefined && input.width > 0) {
+        annotation.setBorderWidth(input.width);
+      } else {
+        annotation.setBorderWidth(0);
+      }
+    } else if (annotation.hasBorder()) {
       annotation.setBorderWidth(Math.max(0.5, Math.min(10, input.width)));
+    }
     if (
       input.type === "Highlight" ||
       input.type === "Underline" ||
@@ -261,14 +327,17 @@ function addAnnotation(page: mupdf.PDFPage, input: AnnotationInput) {
         points[points.length - 1] as mupdf.Point,
       );
       annotation.setLineEndingStyles("None", "OpenArrow");
-    } else {
-      annotation.setRect(input.rect as mupdf.Rect);
-      if (input.type === "FreeText")
-        annotation.setDefaultAppearance(
-          "Helv",
-          14,
-          input.color as mupdf.AnnotColor,
+    } else if (input.type === "Stamp") {
+      if (!input.imageBytes || input.imageBytes.length === 0) {
+        throw new Error(
+          "Signature image data is required for stamp annotations.",
         );
+      }
+      annotation.setRect(input.rect as mupdf.Rect);
+      const image = new mupdf.Image(input.imageBytes);
+      annotation.setStampImage(image);
+    } else if (input.type !== "FreeText") {
+      annotation.setRect(input.rect as mupdf.Rect);
       if (input.type === "Text") annotation.setIcon("Comment");
     }
     if (input.contents) annotation.setContents(input.contents.slice(0, 5000));

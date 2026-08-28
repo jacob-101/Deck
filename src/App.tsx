@@ -36,6 +36,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   PenLine,
+  PenTool,
   Plus,
   Redo2,
   RotateCw,
@@ -69,10 +70,17 @@ import {
   type Tool,
 } from "./types";
 import { parsePageRange } from "./core/ranges";
-import { ANNOTATION_COLORS, usePreferences } from "./core/preferences";
+import {
+  ANNOTATION_COLORS,
+  COLOR_NAMES,
+  TEXT_COLORS,
+  TEXT_COLOR_NAMES,
+  usePreferences,
+} from "./core/preferences";
 import { Settings, type SettingsSection } from "./components/Settings";
 import { APP_VERSION, BrandIcon } from "./components/Brand";
 import { AnnotationEditor } from "./components/AnnotationEditor";
+import { SignatureModal, type SignatureResult } from "./components/SignatureModal";
 import { DocumentDetails } from "./components/DocumentDetails";
 import { DocumentOutline } from "./components/DocumentOutline";
 import { annotationHex, annotationName } from "./core/annotation-style";
@@ -144,6 +152,12 @@ const tools: {
     icon: MessageSquare,
     hint: "Click anywhere to leave a note.",
   },
+  {
+    id: "Stamp",
+    label: "Sign",
+    icon: PenTool,
+    hint: "Click to create and place a visible signature.",
+  },
 ];
 const colors = ANNOTATION_COLORS;
 const download = (bytes: Uint8Array, name: string) => {
@@ -208,6 +222,20 @@ export default function App() {
   const [modal, setModal] = useState<Modal | null>(null);
   const [input, setInput] = useState("");
   const [modalError, setModalError] = useState("");
+  const [signatureModalOpen, setSignatureModalOpen] = useState(false);
+  const [selectedAnnotationId, setSelectedAnnotationId] = useState<
+    number | null
+  >(null);
+  const [pendingStampRect, setPendingStampRect] = useState<number[] | null>(
+    null,
+  );
+  const [textModalColor, setTextModalColor] = useState(
+    preferences.defaultTextColor || "#1f2421",
+  );
+  const [textModalFontSize, setTextModalFontSize] = useState(
+    String(preferences.defaultFontSize || 14),
+  );
+  const [textModalFont, setTextModalFont] = useState("Helv");
   const dialog = useRef<HTMLDialogElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
@@ -527,6 +555,49 @@ export default function App() {
       { type: "annotate", page, annotation },
       `Add ${annotation.type === "Text" ? "note" : annotation.type.toLowerCase()}`,
     );
+  const handleSignatureSelect = (sig: SignatureResult) => {
+    if (!revision) return;
+    const pInfo = revision.info.pages[page];
+    const pw = pInfo?.width || 612;
+    const ph = pInfo?.height || 792;
+    let rect: number[];
+    if (pendingStampRect) {
+      rect = pendingStampRect;
+      setPendingStampRect(null);
+    } else {
+      const targetW = Math.min(pw * 0.45, 180);
+      const targetH = Math.min(
+        ph * 0.25,
+        Math.max(20, Math.round(targetW * (sig.height / sig.width))),
+      );
+      const x0 = Math.round((pw - targetW) / 2);
+      const y0 = Math.round(ph * 0.7);
+      rect = [x0, y0, x0 + targetW, y0 + targetH];
+    }
+
+    addAnnotation({
+      type: "Stamp",
+      rect,
+      color: [0, 0, 0],
+      width: 1,
+      imageBytes: sig.imageBytes,
+    });
+    setTool("select");
+    setTab("notes");
+    notify("Signature placed on page. Drag to reposition or resize.");
+  };
+  const handleUpdateAnnotationRect = (id: number, newRect: number[]) => {
+    if (!revision) return;
+    applyEdit(
+      {
+        type: "update-annotation",
+        page,
+        id,
+        patch: { rect: newRect },
+      },
+      "Move annotation",
+    );
+  };
   const printDocument = () =>
     void perform("Preparing all pages for print…", async () => {
       if (!pdf) return;
@@ -644,8 +715,36 @@ export default function App() {
         event.target instanceof HTMLElement &&
         !!event.target.closest('input, textarea, [contenteditable="true"]');
       if (event.key === "Escape") {
+        setSelectedAnnotationId(null);
         if (!settings && !modal && !editor && !details) setTool("select");
         return;
+      }
+      if (
+        (event.key === "Backspace" || event.key === "Delete") &&
+        selectedAnnotationId !== null &&
+        !input &&
+        !modal &&
+        !settings &&
+        !editor &&
+        !details &&
+        !busyRef.current
+      ) {
+        const targetAnnot = pageInfo?.annotations.find(
+          (a) => a.id === selectedAnnotationId,
+        );
+        if (targetAnnot && targetAnnot.editable && !targetAnnot.locked) {
+          event.preventDefault();
+          applyEdit(
+            {
+              type: "remove-annotation",
+              page,
+              id: selectedAnnotationId,
+            },
+            "Remove annotation",
+          );
+          setSelectedAnnotationId(null);
+          return;
+        }
       }
       if (!window.desktop && (event.metaKey || event.ctrlKey)) {
         if (
@@ -689,7 +788,7 @@ export default function App() {
     };
     window.addEventListener("keydown", keydown);
     return () => window.removeEventListener("keydown", keydown);
-  }, [count, modal, settings, editor, details]);
+  }, [count, modal, settings, editor, details, selectedAnnotationId, pageInfo, page]);
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
       if (dirty && !window.desktop) event.preventDefault();
@@ -706,12 +805,45 @@ export default function App() {
         setModalError("Add some text first.");
         return;
       }
+      if (input.length > 5000) {
+        setModalError("Keep annotation text to 5,000 characters or fewer.");
+        return;
+      }
+      const isFreeText = modal.type === "FreeText";
+      const annotColor = isFreeText
+        ? [1, 3, 5].map(
+            (offset) =>
+              parseInt(textModalColor.slice(offset, offset + 2), 16) / 255,
+          )
+        : rgb(color);
+
+      let rect = modal.rect;
+      if (isFreeText) {
+        const fSize = Number(textModalFontSize) || 14;
+        const lines = input.trim().split("\n");
+        const lineCount = lines.length;
+        const maxLineLen = Math.max(...lines.map((l) => l.length), 1);
+        const charW = fSize * 0.58;
+        const computedW = Math.max(120, maxLineLen * charW + 24);
+        const computedH = Math.max(28, lineCount * (fSize * 1.35) + 16);
+        const pInfo = revision?.info.pages[page];
+        const pw = pInfo?.width || 612;
+        const ph = pInfo?.height || 792;
+        const curW = Math.max(rect[2] - rect[0], computedW);
+        const curH = Math.max(rect[3] - rect[1], computedH);
+        const x0 = Math.max(0, Math.min(pw - curW, rect[0]));
+        const y0 = Math.max(0, Math.min(ph - curH, rect[1]));
+        rect = [x0, y0, Math.min(pw, x0 + curW), Math.min(ph, y0 + curH)];
+      }
+
       addAnnotation({
         type: modal.type,
-        rect: modal.rect,
-        color: rgb(color),
-        width: stroke,
+        rect,
+        color: annotColor,
+        width: isFreeText ? 0 : stroke,
         contents: input.trim(),
+        fontSize: isFreeText ? Number(textModalFontSize) : undefined,
+        font: isFreeText ? textModalFont : undefined,
       });
       setModal(null);
       setTool("select");
@@ -951,7 +1083,13 @@ export default function App() {
                     label={label}
                     active={tool === id}
                     disabled={!canEdit}
-                    onClick={() => setTool(id)}
+                    onClick={() => {
+                      if (id === "Stamp") {
+                        setSignatureModalOpen(true);
+                      } else {
+                        setTool(id);
+                      }
+                    }}
                   >
                     <Icon size={17} />
                   </IconButton>
@@ -1395,10 +1533,36 @@ export default function App() {
                       color={color}
                       stroke={stroke}
                       search={search}
-                      onAnnotate={addAnnotation}
-                      onText={(rect, type) =>
-                        setModal({ kind: "text", type, rect })
+                      annotations={pageInfo?.annotations || []}
+                      selectedAnnotationId={selectedAnnotationId}
+                      onSelectAnnotation={setSelectedAnnotationId}
+                      onUpdateAnnotationRect={handleUpdateAnnotationRect}
+                      onEditAnnotation={(ann) =>
+                        setEditor({
+                          annotation: ann,
+                          page,
+                          revisionId: revision.id,
+                        })
                       }
+                      onAnnotate={addAnnotation}
+                      onText={(rect, type) => {
+                        setTextModalFontSize(
+                          String(preferences.defaultFontSize || 14),
+                        );
+                        setTextModalFont("Helv");
+                        setTextModalColor(
+                          type === "FreeText"
+                            ? preferences.defaultTextColor || "#1f2421"
+                            : preferences.annotationColor,
+                        );
+                        setInput("");
+                        setModalError("");
+                        setModal({ kind: "text", type, rect });
+                      }}
+                      onStamp={(rect) => {
+                        setPendingStampRect(rect);
+                        setSignatureModalOpen(true);
+                      }}
                       onError={reportError}
                     />
                   ) : (
@@ -1710,6 +1874,18 @@ export default function App() {
           </IconButton>
         </div>
       )}
+      {signatureModalOpen && (
+        <SignatureModal
+          onSelect={(sig) => {
+            setSignatureModalOpen(false);
+            handleSignatureSelect(sig);
+          }}
+          onClose={() => {
+            setSignatureModalOpen(false);
+            setPendingStampRect(null);
+          }}
+        />
+      )}
       {dragging && (
         <div className="drop-overlay">
           <Upload size={38} />
@@ -1758,7 +1934,7 @@ export default function App() {
               <p>
                 {modal.type === "Text"
                   ? "Your note will travel with the PDF."
-                  : "This text will be added to the document."}
+                  : "This text will be placed onto the page. The original document stays unchanged."}
               </p>
               <textarea
                 aria-label="Annotation text"
@@ -1766,9 +1942,90 @@ export default function App() {
                 rows={4}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
-                placeholder="A thought worth keeping…"
+                placeholder={
+                  modal.type === "Text"
+                    ? "A thought worth keeping…"
+                    : "Type your text here…"
+                }
                 maxLength={5000}
               />
+              {modal.type === "FreeText" && (
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "12px",
+                    marginTop: "12px",
+                    alignItems: "center",
+                  }}
+                >
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      fontSize: "13px",
+                    }}
+                  >
+                    Size:
+                    <select
+                      value={textModalFontSize}
+                      onChange={(e) => setTextModalFontSize(e.target.value)}
+                      aria-label="Font size"
+                    >
+                      {[10, 12, 14, 16, 18, 24, 32].map((sz) => (
+                        <option key={sz} value={String(sz)}>
+                          {sz} pt{sz === 14 ? " (Default)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      fontSize: "13px",
+                    }}
+                  >
+                    Font:
+                    <select
+                      value={textModalFont}
+                      onChange={(e) => setTextModalFont(e.target.value)}
+                      aria-label="Font family"
+                    >
+                      <option value="Helv">Helvetica / Sans</option>
+                      <option value="Cour">Courier / Mono</option>
+                      <option value="Times">Times / Serif</option>
+                    </select>
+                  </label>
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "6px",
+                      marginLeft: "auto",
+                    }}
+                  >
+                    <span style={{ fontSize: "13px" }}>Color:</span>
+                    <div className="swatches">
+                      {TEXT_COLORS.map((swatch, i) => (
+                        <button
+                          key={swatch}
+                          type="button"
+                          className={`swatch ${textModalColor === swatch ? "selected" : ""}`}
+                          style={{ background: swatch }}
+                          title={TEXT_COLOR_NAMES[i]}
+                          aria-label={TEXT_COLOR_NAMES[i]}
+                          onClick={() => setTextModalColor(swatch)}
+                        >
+                          {textModalColor === swatch && <Check size={12} />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </>
           ) : modal?.kind === "delete" ? (
             <p>

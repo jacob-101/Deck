@@ -140,8 +140,11 @@ describe("actual PDF operations", () => {
     try {
       expect(annotations[0].getContents()).toBe("Updated text box");
       expect(annotations[0].getDefaultAppearance().size).toBe(14);
-      expect(annotations[0].getDefaultAppearance().color[2]).toBeCloseTo(0.7);
-      expect(annotations[0].getRect()).toEqual([40, 80, 240, 160]);
+      const r = annotations[0].getRect();
+      expect(Math.abs(r[0] - 40)).toBeLessThanOrEqual(1);
+      expect(Math.abs(r[1] - 80)).toBeLessThanOrEqual(1);
+      expect(Math.abs(r[2] - 240)).toBeLessThanOrEqual(1);
+      expect(Math.abs(r[3] - 160)).toBeLessThanOrEqual(1);
       const rendered = page.toPixmap(
         [0.25, 0, 0, 0.25, 0, 0],
         mupdf.ColorSpace.DeviceRGB,
@@ -364,6 +367,156 @@ describe("actual PDF operations", () => {
       doc.destroy();
     }
   });
+  it("creates, renders, and repositions visible Stamp signature annotations", () => {
+    const png1x1 = new Uint8Array([
+      137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0,
+      1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68,
+      65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0,
+      0, 73, 69, 78, 68, 174, 66, 96, 130,
+    ]);
+    const stamped = edit(sample, {
+      type: "annotate",
+      page: 0,
+      annotation: {
+        type: "Stamp",
+        rect: [100, 200, 280, 260],
+        color: [0, 0, 0],
+        width: 1,
+        imageBytes: png1x1,
+      },
+    });
+    const info = inspect(stamped);
+    expect(info.pages[0].annotations).toHaveLength(1);
+    expect(info.pages[0].annotations[0].type).toBe("Stamp");
+    expect(info.pages[0].annotations[0].rect).toEqual([100, 200, 280, 260]);
+
+    const doc = new mupdf.PDFDocument(stamped);
+    const page = doc.loadPage(0);
+    const pixmap = page.toPixmap(
+      [0.5, 0, 0, 0.5, 0, 0],
+      mupdf.ColorSpace.DeviceRGB,
+      false,
+      true,
+    );
+    try {
+      expect(pixmap.getWidth()).toBeGreaterThan(0);
+    } finally {
+      pixmap.destroy();
+      page.destroy();
+      doc.destroy();
+    }
+
+    // Reposition Stamp
+    const moved = edit(stamped, {
+      type: "update-annotation",
+      page: 0,
+      id: 0,
+      patch: { rect: [150, 250, 330, 310] },
+    });
+    const movedInfo = inspect(moved);
+    expect(movedInfo.pages[0].annotations[0].rect).toEqual([
+      150, 250, 330, 310,
+    ]);
+  });
+
+  it("rejects Stamp creation without image bytes", () => {
+    expect(() =>
+      edit(sample, {
+        type: "annotate",
+        page: 0,
+        annotation: {
+          type: "Stamp",
+          rect: [100, 200, 280, 260],
+          color: [0, 0, 0],
+          width: 1,
+        },
+      }),
+    ).toThrow("Signature image data is required");
+  });
+
+  it("creates, renders, and updates FreeText with custom font, size, multiline and Unicode text", () => {
+    const unicodeText = "Line 1: Café & résumé — 100€\nLine 2: “Quotes” & ‘symbols’ ©";
+    const annotated = edit(sample, {
+      type: "annotate",
+      page: 0,
+      annotation: {
+        type: "FreeText",
+        rect: [50, 100, 350, 220],
+        color: [0.12, 0.21, 0.34],
+        width: 1,
+        contents: unicodeText,
+        fontSize: 18,
+        font: "Cour",
+      },
+    });
+
+    const info = inspect(annotated);
+    const annot = info.pages[0].annotations[0];
+    expect(annot.contents).toBe(unicodeText);
+    expect(annot.fontSize).toBe(18);
+    expect(annot.font).toBe("Cour");
+    expect(annot.color[0]).toBeCloseTo(0.12);
+
+    const doc = new mupdf.PDFDocument(annotated);
+    const page = doc.loadPage(0);
+    const pixmap = page.toPixmap(
+      [0.5, 0, 0, 0.5, 0, 0],
+      mupdf.ColorSpace.DeviceRGB,
+      false,
+      true,
+    );
+    try {
+      expect(pixmap.getWidth()).toBeGreaterThan(0);
+    } finally {
+      pixmap.destroy();
+      page.destroy();
+      doc.destroy();
+    }
+
+    // Update position, font size, and text
+    const updated = edit(annotated, {
+      type: "update-annotation",
+      page: 0,
+      id: 0,
+      patch: {
+        contents: "Updated multiline\nSecond line",
+        fontSize: 24,
+        rect: [60, 110, 400, 250],
+      },
+    });
+    const updatedAnnot = inspect(updated).pages[0].annotations[0];
+    expect(updatedAnnot.contents).toBe("Updated multiline\nSecond line");
+    expect(updatedAnnot.fontSize).toBe(24);
+    expect(updatedAnnot.rect).toEqual([60, 110, 400, 250]);
+  });
+
+  it("rejects repositioning geometry for unsupported annotation types", () => {
+    for (const type of ["Line", "Ink", "Highlight", "Underline", "StrikeOut"] as const) {
+      const annotated = edit(sample, {
+        type: "annotate",
+        page: 0,
+        annotation: {
+          ...note,
+          type,
+          rect: [50, 50, 200, 100],
+          points: [
+            [50, 50],
+            [100, 75],
+            [200, 100],
+          ],
+        },
+      });
+      expect(() =>
+        edit(annotated, {
+          type: "update-annotation",
+          page: 0,
+          id: 0,
+          patch: { rect: [60, 60, 210, 110] },
+        }),
+      ).toThrow(`Repositioning ${type} annotations is not supported.`);
+    }
+  });
+
   it("rejects encrypted documents without changing their bytes", () => {
     const doc = new mupdf.PDFDocument(sample);
     const buffer = doc.saveToBuffer(

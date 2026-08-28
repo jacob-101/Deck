@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, PenLine, X } from "lucide-react";
 import type { AnnotationInfo, AnnotationPatch } from "../types";
-import { ANNOTATION_COLORS, COLOR_NAMES } from "../core/preferences";
+import {
+  ANNOTATION_COLORS,
+  COLOR_NAMES,
+  TEXT_COLORS,
+  TEXT_COLOR_NAMES,
+} from "../core/preferences";
 import { annotationHex, annotationName } from "../core/annotation-style";
 import { IconButton } from "./Button";
 
@@ -21,21 +26,32 @@ export function AnnotationEditor({
   const originalColor = annotationHex(annotation.color);
   const [color, setColor] = useState(originalColor);
   const [width, setWidth] = useState(String(annotation.width ?? 2));
+  const [fontSize, setFontSize] = useState(String(annotation.fontSize ?? 14));
+  const [font, setFont] = useState(annotation.font ?? "Helv");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const textAnnotation =
-    annotation.type === "Text" || annotation.type === "FreeText";
+
+  const isFreeText = annotation.type === "FreeText";
+  const isStickyNote = annotation.type === "Text";
+  const textAnnotation = isStickyNote || isFreeText;
+
   const dirty =
     contents !== annotation.contents ||
     color !== originalColor ||
     (annotation.width !== null &&
-      (!width.trim() || Number(width) !== annotation.width));
+      (!width.trim() || Number(width) !== annotation.width)) ||
+    (isFreeText &&
+      (Number(fontSize) !== (annotation.fontSize ?? 14) ||
+        font !== (annotation.font ?? "Helv")));
+
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
+
   useEffect(() => {
     setError("");
-  }, [contents, color, width]);
+  }, [contents, color, width, fontSize, font]);
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!dirty || busy) return;
@@ -58,6 +74,17 @@ export function AnnotationEditor({
       setError("Choose a line weight between 0 and 20 pt.");
       return;
     }
+    if (
+      isFreeText &&
+      (!fontSize.trim() ||
+        !Number.isFinite(Number(fontSize)) ||
+        Number(fontSize) < 6 ||
+        Number(fontSize) > 144)
+    ) {
+      setError("Choose a font size between 6 and 144 pt.");
+      return;
+    }
+
     const patch: AnnotationPatch = {};
     if (contents !== annotation.contents) patch.contents = contents;
     if (color !== originalColor)
@@ -66,6 +93,10 @@ export function AnnotationEditor({
       );
     if (annotation.width !== null && Number(width) !== annotation.width)
       patch.width = Number(width);
+    if (isFreeText && Number(fontSize) !== (annotation.fontSize ?? 14))
+      patch.fontSize = Number(fontSize);
+    if (isFreeText && font !== (annotation.font ?? "Helv")) patch.font = font;
+
     if (!Object.keys(patch).length) return;
     setBusy(true);
     try {
@@ -80,6 +111,10 @@ export function AnnotationEditor({
       setBusy(false);
     }
   };
+
+  const paletteColors = isFreeText ? TEXT_COLORS : ANNOTATION_COLORS;
+  const paletteNames = isFreeText ? TEXT_COLOR_NAMES : COLOR_NAMES;
+
   return (
     <dialog
       className="modal annotation-editor"
@@ -121,20 +156,104 @@ export function AnnotationEditor({
             onChange={(event) => setContents(event.target.value)}
             maxLength={5000}
             placeholder={
-              textAnnotation ? "Your note…" : "Add a comment to this mark…"
+              textAnnotation ? "Your text…" : "Add a comment to this mark…"
             }
           />
-          <div className="editor-style-row">
+
+          {isFreeText && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: "12px",
+                margin: "12px 0 6px",
+              }}
+            >
+              <label>
+                Font Size
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    marginTop: "4px",
+                  }}
+                >
+                  <input
+                    type="number"
+                    aria-label="Text font size"
+                    min={6}
+                    max={144}
+                    value={fontSize}
+                    onChange={(e) => setFontSize(e.target.value)}
+                    style={{ width: "70px" }}
+                  />
+                  <span style={{ fontSize: "12px", color: "var(--muted)" }}>
+                    pt
+                  </span>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "4px",
+                      marginLeft: "auto",
+                    }}
+                  >
+                    {[10, 14, 18, 24].map((sz) => (
+                      <button
+                        type="button"
+                        key={sz}
+                        className="btn-subtle"
+                        style={{
+                          padding: "2px 6px",
+                          fontSize: "11px",
+                          borderRadius: "4px",
+                          background:
+                            Number(fontSize) === sz
+                              ? "var(--accent-subtle)"
+                              : "transparent",
+                          fontWeight: Number(fontSize) === sz ? 600 : 400,
+                        }}
+                        onClick={() => setFontSize(String(sz))}
+                      >
+                        {sz}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </label>
+
+              <label>
+                Font Family
+                <select
+                  aria-label="Text font family"
+                  value={font}
+                  onChange={(e) => setFont(e.target.value)}
+                  style={{
+                    width: "100%",
+                    marginTop: "4px",
+                    padding: "6px 8px",
+                    borderRadius: "6px",
+                    border: "1px solid var(--border)",
+                  }}
+                >
+                  <option value="Helv">Helvetica (Standard)</option>
+                  <option value="Cour">Courier (Monospace)</option>
+                </select>
+              </label>
+            </div>
+          )}
+
+          <div className="editor-style-row" style={{ marginTop: "10px" }}>
             <div>
               <label>
-                {annotation.type === "FreeText" ? "Text color" : "Color"}
+                {isFreeText ? "Text color" : "Color"}
               </label>
               <div className="editor-colors">
-                {ANNOTATION_COLORS.map((item, index) => (
+                {paletteColors.map((item, index) => (
                   <button
                     type="button"
                     key={item}
-                    aria-label={`${COLOR_NAMES[index]} color`}
+                    aria-label={`${paletteNames[index]} color`}
                     aria-pressed={color === item}
                     style={{ background: item }}
                     onClick={() => setColor(item)}

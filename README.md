@@ -32,7 +32,9 @@ The application is generated in `release/mac-arm64/OpenPDF Studio.app` on Apple 
 
 - Native PDF open/save dialogs, recent documents, Finder open-file events, drag and drop.
 - Page thumbnails, page navigation, zoom, fit page/width, fullscreen, text selection/copy, text search, dark mode.
-- Standard PDF highlights, underline, strike-through, ink, rectangles, ellipses, arrows, text boxes, sticky notes. Select text while a markup tool is active; drag to draw; click to place a note or text box.
+- Standard PDF highlights, underline, strike-through, ink, rectangles, ellipses, arrows, text boxes, sticky notes, and visible signature stamps. Select text while a markup tool is active; drag to draw; click to place a note or text box.
+- **Add Text (FreeText):** place text boxes anywhere on the page with customizable font sizes (10–32 pt), font families (Helvetica, Courier, Times), dedicated text colors, multiline/Unicode characters, and interactive move/resize bounding boxes on the page canvas.
+- **Sign (Stamp):** draw a signature, type in elegant script styles, or import PNG/JPEG images (with automatic background transparency removal). Move and resize signatures with proportional aspect-ratio preservation. Save signatures locally with explicit opt-in.
 - Annotation list, jump to annotated page, edit text/comments and color, adjust shape line weight, remove annotations. Locked annotations cannot be edited or deleted.
 - Embedded PDF table of contents, including nested sections and page destinations that follow page reordering. External destinations are not opened.
 - Document details: title, author, subject, creator, producer, PDF version, page dimensions, file size, and annotation count.
