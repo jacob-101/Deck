@@ -196,6 +196,12 @@ try {
   await expect(analysis.locator("#markdown-preview")).toContainText(
     "A little less friction",
   );
+  const copyOCR = analysis.getByRole("button", { name: "Copy OCR text" });
+  await copyOCR.click();
+  await expect(copyOCR).toContainText("Copied");
+  expect(await app.evaluate(({ clipboard }) => clipboard.readText())).toContain(
+    "A little less friction",
+  );
   await page.screenshot({
     animations: "disabled",
     path: join(output, "document-ocr.png"),
@@ -209,7 +215,7 @@ try {
   );
   await analysis.getByRole("button", { name: "Done", exact: true }).click();
   steps.push(
-    "Local document classification, Apple Vision OCR, and native Markdown export",
+    "Clear OCR workspace, native text copy, Apple Vision recognition, and Markdown export",
   );
   await expect(page.getByLabel("Page fit", { exact: true })).toHaveValue(
     "width",

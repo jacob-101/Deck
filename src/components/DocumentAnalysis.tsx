@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import type { PdfProcessResult } from "@firecrawl/pdf-inspector-wasm";
-import { FileSearch, Download, ShieldCheck, X } from "lucide-react";
+import {
+  Check,
+  Copy,
+  Download,
+  FileSearch,
+  ScanText,
+  ShieldCheck,
+  X,
+} from "lucide-react";
 import { analyzePDF } from "../core/inspector";
 import { IconButton } from "./Button";
 import type { OCRResult } from "../types";
@@ -30,6 +38,7 @@ export function DocumentAnalysis({
   const [ocr, setOcr] = useState<OCRResult | null>(null);
   const [ocrBusy, setOcrBusy] = useState(false);
   const [language, setLanguage] = useState("auto");
+  const [copied, setCopied] = useState(false);
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
@@ -78,6 +87,18 @@ export function DocumentAnalysis({
       setError(cause instanceof Error ? cause.message : "Export failed.");
     } finally {
       setSaving(false);
+    }
+  };
+  const copyRecognizedText = async () => {
+    if (!markdown) return;
+    setError("");
+    try {
+      if (window.desktop) await window.desktop.copyText(markdown);
+      else await navigator.clipboard.writeText(markdown);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setError("Could not copy the recognized text.");
     }
   };
   const runOCR = async (allPages = false) => {
@@ -187,62 +208,80 @@ export function DocumentAnalysis({
             Classification is an estimate. Use offline OCR for scanned pages,
             then review the recognized text before relying on it.
           </p>
-          <div className="ocr-controls">
-            <label>
-              OCR language
-              <select
-                aria-label="OCR language"
-                value={language}
-                disabled={ocrBusy}
-                onChange={(e) => setLanguage(e.target.value)}
+          <section className="ocr-workflow" aria-labelledby="ocr-title">
+            <div className="ocr-workflow-intro">
+              <div className="ocr-mark" aria-hidden="true">
+                <ScanText size={28} strokeWidth={1.6} />
+                <strong>OCR</strong>
+              </div>
+              <div>
+                <h3 id="ocr-title">Make scanned pages readable</h3>
+                <p>
+                  Turn text inside page images into searchable, copyable text
+                  using Apple Vision on this Mac.
+                </p>
+              </div>
+            </div>
+            <div className="ocr-controls">
+              <label>
+                Recognition language
+                <select
+                  aria-label="OCR language"
+                  value={language}
+                  disabled={ocrBusy}
+                  onChange={(e) => setLanguage(e.target.value)}
+                >
+                  <option value="auto">Automatic / English</option>
+                  <option value="en-US">English</option>
+                  <option value="zh-Hans">Chinese (Simplified)</option>
+                  <option value="zh-Hant">Chinese (Traditional)</option>
+                  <option value="ja-JP">Japanese</option>
+                  <option value="ko-KR">Korean</option>
+                  <option value="fr-FR">French</option>
+                  <option value="de-DE">German</option>
+                  <option value="es-ES">Spanish</option>
+                </select>
+              </label>
+              <button
+                className="primary ocr-run"
+                disabled={
+                  ocrBusy ||
+                  !window.desktop ||
+                  (result.pagesNeedingOcr.length || result.pageCount) > 100
+                }
+                onClick={() => void runOCR(false)}
               >
-                <option value="auto">Automatic / English</option>
-                <option value="en-US">English</option>
-                <option value="zh-Hans">Chinese (Simplified)</option>
-                <option value="zh-Hant">Chinese (Traditional)</option>
-                <option value="ja-JP">Japanese</option>
-                <option value="ko-KR">Korean</option>
-                <option value="fr-FR">French</option>
-                <option value="de-DE">German</option>
-                <option value="es-ES">Spanish</option>
-              </select>
-            </label>
-            <button
-              className="primary"
-              disabled={
-                ocrBusy ||
-                !window.desktop ||
-                (result.pagesNeedingOcr.length || result.pageCount) > 100
-              }
-              onClick={() => void runOCR(false)}
-            >
-              {ocrBusy ? (
-                <>
-                  <span className="spinner" /> Recognizing…
-                </>
-              ) : (
-                `Run Offline OCR${result.pagesNeedingOcr.length ? ` (${result.pagesNeedingOcr.length} suggested page${result.pagesNeedingOcr.length === 1 ? "" : "s"})` : ""}`
-              )}
-            </button>
-            {result.pagesNeedingOcr.length > 0 &&
-              result.pagesNeedingOcr.length < result.pageCount && (
+                {ocrBusy ? (
+                  <>
+                    <span className="spinner" /> Recognizing…
+                  </>
+                ) : (
+                  <>
+                    <ScanText size={16} />
+                    {`Run Offline OCR${result.pagesNeedingOcr.length ? ` · ${result.pagesNeedingOcr.length} suggested` : ""}`}
+                  </>
+                )}
+              </button>
+              {result.pagesNeedingOcr.length > 0 &&
+                result.pagesNeedingOcr.length < result.pageCount && (
+                  <button
+                    className="secondary"
+                    disabled={ocrBusy || result.pageCount > 100}
+                    onClick={() => void runOCR(true)}
+                  >
+                    OCR all pages
+                  </button>
+                )}
+              {ocrBusy && (
                 <button
                   className="secondary"
-                  disabled={ocrBusy || result.pageCount > 100}
-                  onClick={() => void runOCR(true)}
+                  onClick={() => window.desktop?.cancelOCR()}
                 >
-                  OCR all pages
+                  Cancel OCR
                 </button>
               )}
-            {ocrBusy && (
-              <button
-                className="secondary"
-                onClick={() => window.desktop?.cancelOCR()}
-              >
-                Cancel OCR
-              </button>
-            )}
-          </div>
+            </div>
+          </section>
           {ocr && (
             <div className="analysis-summary">
               <strong>{ocr.engine} OCR complete</strong>
@@ -259,9 +298,19 @@ export function DocumentAnalysis({
           )}
           {markdown ? (
             <>
-              <label htmlFor="markdown-preview">
-                {ocr ? "OCR Markdown preview" : "Markdown preview"}
-              </label>
+              <div className="markdown-heading">
+                <label htmlFor="markdown-preview">
+                  {ocr ? "Recognized text" : "Extracted text"}
+                </label>
+                <button
+                  className={`copy-text-button ${copied ? "copied" : ""}`}
+                  onClick={() => void copyRecognizedText()}
+                  aria-label={ocr ? "Copy OCR text" : "Copy extracted text"}
+                >
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                  {copied ? "Copied" : ocr ? "Copy OCR text" : "Copy text"}
+                </button>
+              </div>
               <pre
                 id="markdown-preview"
                 className="markdown-preview"

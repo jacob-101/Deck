@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { DesktopAPI, OpenFile } from "../src/types";
 const api: DesktopAPI = {
+  copyText: (value) => ipcRenderer.invoke("clipboard:write-text", value),
   open: () => ipcRenderer.invoke("files:open"),
   openRecent: (id) => ipcRenderer.invoke("files:recent", id),
   openImages: () => ipcRenderer.invoke("files:open-images"),

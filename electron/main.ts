@@ -1,6 +1,7 @@
 import {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   Menu,
@@ -173,6 +174,12 @@ async function deliverPending() {
   }
 }
 function registerIPC() {
+  ipcMain.handle("clipboard:write-text", (event, value: unknown) => {
+    trusted(event);
+    if (typeof value !== "string" || value.length > 10 * 1024 * 1024)
+      throw new Error("Text is too large to copy.");
+    clipboard.writeText(value);
+  });
   ipcMain.handle("files:open", async (event) => {
     trusted(event);
     const result = await dialog.showOpenDialog(win, {

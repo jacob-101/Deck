@@ -20,6 +20,7 @@ export type OCRResult = {
   engine: string;
 };
 export type DesktopAPI = {
+  copyText(value: string): Promise<void>;
   open(): Promise<OpenFile | null>;
   openRecent(id: string): Promise<OpenFile>;
   openImages(): Promise<ImageFile[] | null>;

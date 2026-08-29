@@ -2215,7 +2215,8 @@ export default function App() {
                 <span>AGPL-3.0-only · No telemetry</span>
               </div>
               <p className="subtle">
-                This release does not edit existing PDF text or support OCR,
+                Local Apple Vision OCR supports up to 100 selected pages per
+                run. This release does not edit existing PDF text or support
                 protected PDFs, forms, or digital signatures. Saves can
                 invalidate existing signatures. Documents: up to 50 MB / 500
                 pages.

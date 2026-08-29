@@ -556,7 +556,8 @@ export function Settings({
                 </div>
                 <p className="about-limits">
                   This early release reads, annotates, organizes, and saves PDFs
-                  up to 50 MB / 500 pages. Existing-text editing, OCR, forms,
+                  up to 50 MB / 500 pages, with local Apple Vision OCR for up to
+                  100 selected pages per run. Existing-text editing, forms,
                   protected PDFs, and digital signatures are not yet supported.
                   Saving may invalidate existing signatures.
                 </p>
