@@ -654,7 +654,14 @@ export function createSample(): Uint8Array {
   }
 }
 
-export function imagesToPDF(images: { name: string; bytes: Uint8Array }[]) {
+export function imagesToPDF(
+  images: {
+    name: string;
+    bytes: Uint8Array;
+    crop?: { x: number; y: number; width: number; height: number };
+    rotation?: 0 | 90 | 180 | 270;
+  }[],
+) {
   if (!Array.isArray(images) || images.length < 1 || images.length > 100)
     throw new Error("Choose between 1 and 100 images.");
   const doc = new mupdf.PDFDocument();
@@ -687,17 +694,41 @@ export function imagesToPDF(images: { name: string; bytes: Uint8Array }[]) {
           throw new Error(
             `${input.name || "An image"} has invalid dimensions.`,
           );
-        const maxWidth = pixelsWide >= pixelsHigh ? 792 : 612;
-        const maxHeight = pixelsWide >= pixelsHigh ? 612 : 792;
-        const fit = Math.min(maxWidth / pixelsWide, maxHeight / pixelsHigh);
-        const width = Math.max(1, pixelsWide * fit);
-        const height = Math.max(1, pixelsHigh * fit);
+        const sourceCrop = input.crop ?? { x: 0, y: 0, width: 1, height: 1 };
+        const crop = {
+          x: Math.max(0, Math.min(0.99, Number(sourceCrop.x) || 0)),
+          y: Math.max(0, Math.min(0.99, Number(sourceCrop.y) || 0)),
+          width: Math.max(0.01, Math.min(1, Number(sourceCrop.width) || 1)),
+          height: Math.max(0.01, Math.min(1, Number(sourceCrop.height) || 1)),
+        };
+        crop.width = Math.min(crop.width, 1 - crop.x);
+        crop.height = Math.min(crop.height, 1 - crop.y);
+        const rotation = [0, 90, 180, 270].includes(input.rotation ?? 0)
+          ? (input.rotation ?? 0)
+          : 0;
+        const croppedWidth = pixelsWide * crop.width;
+        const croppedHeight = pixelsHigh * crop.height;
+        const quarterTurn = rotation === 90 || rotation === 270;
+        const displayWidth = quarterTurn ? croppedHeight : croppedWidth;
+        const displayHeight = quarterTurn ? croppedWidth : croppedHeight;
+        const maxWidth = displayWidth >= displayHeight ? 792 : 612;
+        const maxHeight = displayWidth >= displayHeight ? 612 : 792;
+        const fit = Math.min(
+          maxWidth / displayWidth,
+          maxHeight / displayHeight,
+        );
+        const width = Math.max(1, croppedWidth * fit);
+        const height = Math.max(1, croppedHeight * fit);
+        const fullWidth = pixelsWide * fit;
+        const fullHeight = pixelsHigh * fit;
+        const offsetX = -crop.x * fullWidth;
+        const offsetY = -(1 - crop.y - crop.height) * fullHeight;
         imageRef = doc.addImage(image);
         page = doc.addPage(
           [0, 0, width, height],
-          0,
+          rotation,
           { XObject: { Im0: imageRef } },
-          `q ${width} 0 0 ${height} 0 0 cm /Im0 Do Q`,
+          `q 0 0 ${width} ${height} re W n ${fullWidth} 0 0 ${fullHeight} ${offsetX} ${offsetY} cm /Im0 Do Q`,
         );
         doc.insertPage(-1, page);
       } finally {

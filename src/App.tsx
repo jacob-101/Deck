@@ -67,6 +67,8 @@ import {
   type AnnotationInfo,
   type AnnotationPatch,
   type EditCommand,
+  type ImageFile,
+  type ImagePDFInput,
   type OpenFile,
   type RecentFile,
   type Tool,
@@ -88,6 +90,7 @@ import {
 } from "./components/SignatureModal";
 import { DocumentDetails } from "./components/DocumentDetails";
 import { DocumentAnalysis } from "./components/DocumentAnalysis";
+import { ImagePDFEditor } from "./components/ImagePDFEditor";
 import { DocumentOutline } from "./components/DocumentOutline";
 import { annotationHex, annotationName } from "./core/annotation-style";
 GlobalWorkerOptions.workerSrc = workerUrl;
@@ -231,6 +234,7 @@ export default function App() {
   const [input, setInput] = useState("");
   const [modalError, setModalError] = useState("");
   const [signatureModalOpen, setSignatureModalOpen] = useState(false);
+  const [imageEditor, setImageEditor] = useState<ImageFile[] | null>(null);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<
     number | null
   >(null);
@@ -661,7 +665,7 @@ export default function App() {
     }
     if (
       busyRef.current ||
-      ((modal || editor || details) && name !== "save-and-close")
+      ((modal || editor || details || imageEditor) && name !== "save-and-close")
     )
       return;
     if (name === "settings" || name === "about") {
@@ -747,7 +751,8 @@ export default function App() {
         !!event.target.closest('input, textarea, [contenteditable="true"]');
       if (event.key === "Escape") {
         setSelectedAnnotationId(null);
-        if (!settings && !modal && !editor && !details) setTool("select");
+        if (!settings && !modal && !editor && !details && !imageEditor)
+          setTool("select");
         return;
       }
       if (
@@ -758,6 +763,7 @@ export default function App() {
         !settings &&
         !editor &&
         !details &&
+        !imageEditor &&
         !busyRef.current
       ) {
         const targetAnnot = pageInfo?.annotations.find(
@@ -809,6 +815,7 @@ export default function App() {
         !settings &&
         !editor &&
         !details &&
+        !imageEditor &&
         !busyRef.current
       ) {
         if (event.key === "ArrowRight" || event.key === "PageDown")
@@ -825,6 +832,7 @@ export default function App() {
     settings,
     editor,
     details,
+    imageEditor,
     selectedAnnotationId,
     pageInfo,
     page,
@@ -960,12 +968,29 @@ export default function App() {
     setMode((current) => (current === "organize" ? "read" : current));
   };
   const canEdit = !!pdf && !busy;
-  const convertImages = () =>
-    void perform("Converting images…", async () => {
-      if (!window.desktop)
-        throw new Error("Image conversion is available in the Mac app.");
-      const images = await window.desktop.openImages();
-      if (!images) return;
+  const chooseImagesForPDF = async () => {
+    if (!window.desktop)
+      throw new Error("Image conversion is available in the Mac app.");
+    return window.desktop.openImages();
+  };
+  const convertImages = () => {
+    setError("");
+    void chooseImagesForPDF()
+      .then((images) => {
+        if (images?.length) setImageEditor(images);
+      })
+      .catch((cause) =>
+        setError(
+          cause instanceof Error ? cause.message : "Could not open images.",
+        ),
+      );
+  };
+  const finishImageConversion = async (images: ImagePDFInput[]) => {
+    if (!window.desktop || busyRef.current) return;
+    busyRef.current = true;
+    setBusy("Creating your PDF…");
+    setError("");
+    try {
       const result = await pdfEngine.images(images);
       const saved = await window.desktop.save(
         result.bytes,
@@ -978,10 +1003,24 @@ export default function App() {
       if (!saved) return;
       state.load(result.bytes, result.info, saved.name, saved.id);
       applyDocumentDefaults();
+      setImageEditor(null);
       notify(
-        `${images.length} image${images.length === 1 ? "" : "s"} converted without downsampling.`,
+        `${images.length} image${images.length === 1 ? "" : "s"} converted with original pixels preserved.`,
       );
-    });
+    } catch (cause) {
+      throw new Error(
+        cause instanceof Error
+          ? cause.message.replace(
+              /^Error invoking remote method '[^']+': Error: /,
+              "",
+            )
+          : "The images could not be converted.",
+      );
+    } finally {
+      busyRef.current = false;
+      setBusy("");
+    }
+  };
   const convertWord = () =>
     void perform("Converting Word document…", async () => {
       if (!window.desktop)
@@ -1006,7 +1045,7 @@ export default function App() {
       }}
       onDrop={(event) => {
         if (!event.dataTransfer.files.length) return;
-        if (settings || modal || editor || details) {
+        if (settings || modal || editor || details || imageEditor) {
           event.preventDefault();
           setDragging(false);
           return;
@@ -1985,6 +2024,14 @@ export default function App() {
             setSignatureModalOpen(false);
             setPendingStampRect(null);
           }}
+        />
+      )}
+      {imageEditor && (
+        <ImagePDFEditor
+          initialImages={imageEditor}
+          onAdd={chooseImagesForPDF}
+          onCancel={() => setImageEditor(null)}
+          onConvert={finishImageConversion}
         />
       )}
       {dragging && (

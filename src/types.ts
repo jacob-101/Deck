@@ -1,6 +1,16 @@
 export const MAX_FILE_SIZE = 50 * 1024 * 1024;
 export type OpenFile = { id: string | null; name: string; bytes: Uint8Array };
 export type ImageFile = { name: string; bytes: Uint8Array };
+export type ImageCrop = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+export type ImagePDFInput = ImageFile & {
+  crop?: ImageCrop;
+  rotation?: 0 | 90 | 180 | 270;
+};
 export type RecentFile = { id: string; name: string; date: number };
 export type SaveResult = { id: string; name: string } | null;
 export type OCRResult = {

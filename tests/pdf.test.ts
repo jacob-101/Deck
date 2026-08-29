@@ -75,6 +75,61 @@ describe("actual PDF operations", () => {
       portrait.destroy();
     }
   });
+  it("crops and rotates an image through PDF geometry without recompressing it", () => {
+    const source = new mupdf.Pixmap(
+      mupdf.ColorSpace.DeviceRGB,
+      [0, 0, 80, 40],
+      false,
+    );
+    const sourcePixels = source.getPixels();
+    for (let y = 0; y < 40; y++) {
+      for (let x = 0; x < 80; x++) {
+        const offset = y * source.getStride() + x * 3;
+        sourcePixels[offset] = x < 40 ? 230 : 20;
+        sourcePixels[offset + 1] = 20;
+        sourcePixels[offset + 2] = x < 40 ? 20 : 230;
+      }
+    }
+    try {
+      const output = imagesToPDF([
+        {
+          name: "edited.jpg",
+          bytes: source.asJPEG(95),
+          crop: { x: 0.5, y: 0, width: 0.5, height: 0.5 },
+          rotation: 90,
+        },
+      ]);
+      const [page] = inspect(output).pages;
+      expect(page.rotation).toBe(90);
+      expect(page.height).toBeGreaterThan(page.width);
+      const document = new mupdf.PDFDocument(output);
+      const pageObject = document.findPage(0);
+      const imageObject = pageObject
+        .get("Resources", "XObject", "Im0")
+        .resolve();
+      expect(imageObject.get("Filter").asName()).toBe("DCTDecode");
+      const renderedPage = document.loadPage(0);
+      const rendered = renderedPage.toPixmap(
+        [1, 0, 0, 1, 0, 0],
+        mupdf.ColorSpace.DeviceRGB,
+        false,
+      );
+      const renderedPixels = rendered.getPixels();
+      const center =
+        Math.floor(rendered.getHeight() / 2) * rendered.getStride() +
+        Math.floor(rendered.getWidth() / 2) * 3;
+      expect(renderedPixels[center + 2]).toBeGreaterThan(
+        renderedPixels[center],
+      );
+      rendered.destroy();
+      renderedPage.destroy();
+      imageObject.destroy();
+      pageObject.destroy();
+      document.destroy();
+    } finally {
+      source.destroy();
+    }
+  });
   it("rotates and independently duplicates pages", () => {
     const duplicated = edit(sample, { type: "duplicate", page: 0 });
     const rotated = edit(duplicated, { type: "rotate", page: 1, angle: 90 });

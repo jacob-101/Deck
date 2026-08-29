@@ -788,15 +788,42 @@ try {
     { images: [imageOne, imageTwo], output: imagePDF },
   );
   await page.getByRole("button", { name: /Images to PDF/ }).click();
+  const imageEditor = page.getByRole("dialog", { name: "Prepare your PDF" });
+  await expect(imageEditor).toBeVisible();
+  await expect(imageEditor).toContainText("2 pages");
+  await imageEditor.getByRole("button", { name: "Rotate right" }).click();
+  const cropHandle = imageEditor.locator(".crop-handle.se");
+  const handleBox = await cropHandle.boundingBox();
+  if (!handleBox) throw new Error("Crop handle was not visible");
+  await page.mouse.move(
+    handleBox.x + handleBox.width / 2,
+    handleBox.y + handleBox.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(handleBox.x - 35, handleBox.y - 20);
+  await page.mouse.up();
+  await expect(imageEditor.locator(".image-editor-meta")).toContainText(
+    "90° rotation",
+  );
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "image-to-pdf-editor.png"),
+  });
+  await imageEditor.getByRole("button", { name: /Create PDF/ }).click();
   await noBusy();
   await ready();
   const convertedImages = new mupdf.PDFDocument(
     new Uint8Array(await readFile(imagePDF)),
   );
   expect(convertedImages.countPages()).toBe(2);
+  const convertedPage = convertedImages.findPage(0);
+  expect(convertedPage.get("Rotate").asNumber()).toBe(90);
+  convertedPage.destroy();
   convertedImages.destroy();
   await expect(page.locator(".status-left")).toContainText("All changes saved");
-  steps.push("Lossless multi-image PNG conversion to a saved two-page PDF");
+  steps.push(
+    "Lossless crop, rotation, ordering editor and two-page image conversion",
+  );
 
   await app.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows()[0].webContents.send("menu:command", "close"),
