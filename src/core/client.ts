@@ -68,4 +68,6 @@ export const pdfEngine = {
   sample: () => call<PDFResult>({ action: "sample" }),
   extract: (bytes: Uint8Array, pages: number[]) =>
     call<Uint8Array>({ action: "extract", bytes, pages }),
+  images: (images: { name: string; bytes: Uint8Array }[]) =>
+    call<PDFResult>({ action: "images", images }),
 };

@@ -4,7 +4,8 @@
 
 - TypeScript check and Vite/Electron production build.
 - 34 unit tests against real MuPDF documents, preferences storage error handling, and actual temporary files.
-- 27 Electron desktop scenarios, run against both the source build and the packaged Apple Silicon `.app`, including an image-only scanned PDF recognized by the bundled Apple Vision helper.
+- 29 Electron desktop scenarios, run against both the source build and the packaged Apple Silicon `.app`, including an image-only scanned PDF recognized by the bundled Apple Vision helper, lossless ordered image conversion, and offline DOCX conversion with selectable output text.
+- Image conversion verifies landscape/portrait page sizing and preserves JPEG `DCTDecode` streams rather than rasterizing them again. Word conversion verifies a standards-based DOCX fixture through the installed LibreOffice engine and native PDF saving.
 - Local PDF Inspector classification runs in a dedicated Web Worker. The packaged Apple Vision helper performs accurate offline OCR, and native Markdown export was verified against a temporary `.md` file. The drawing regression check confirms annotation updates never remove the visible page stage.
 - Full verification of Add Text (FreeText) with custom font sizes, font families (`Helv`, `Cour`), text colors, multiline/Unicode text (`Café Approval — 100€ ©`), interactive move/resize bounding box on page canvas, and undo/redo.
 - Full verification of Sign (Stamp) workflow across Draw, Type, and Import modes, aspect-ratio preserved corner resizing, opt-in local storage error handling, deletion controls, image format/pixel limits (PNG/JPEG, max 5 MB / 4096px), and persistent rendering in saved PDFs without fallback stamps.

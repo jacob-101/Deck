@@ -12,9 +12,10 @@ import {
 } from "electron";
 import { join, basename, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
-import { readFile, mkdir } from "node:fs/promises";
+import { readFile, mkdir, stat, access, mkdtemp, rm } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import { tmpdir } from "node:os";
 import {
   atomicSave,
   readPDF,
@@ -109,6 +110,42 @@ async function openPath(path: string) {
   await remember(path, id);
   return { id, name: basename(path), bytes };
 }
+function runLocalTool(executable: string, args: string[], timeoutMs = 120000) {
+  return new Promise<void>((resolvePromise, reject) => {
+    const child = spawn(executable, args, {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let stderr = "";
+    const timeout = setTimeout(() => child.kill("SIGTERM"), timeoutMs);
+    child.stderr.on("data", (chunk: Buffer) => {
+      if (stderr.length < 8000) stderr += chunk.toString();
+    });
+    child.on("error", reject);
+    child.on("close", (code, signal) => {
+      clearTimeout(timeout);
+      if (code === 0) resolvePromise();
+      else
+        reject(
+          new Error(
+            signal
+              ? "Document conversion timed out."
+              : stderr.trim() || "The document converter could not complete.",
+          ),
+        );
+    });
+  });
+}
+async function firstAvailable(paths: string[]) {
+  for (const path of paths) {
+    try {
+      await access(path);
+      return path;
+    } catch {
+      /* Try the next local application. */
+    }
+  }
+  return null;
+}
 async function confirmClose(): Promise<"save" | "discard" | "cancel"> {
   const { response } = await dialog.showMessageBox(win, {
     type: "question",
@@ -159,6 +196,101 @@ function registerIPC() {
     const entry = recentFiles.find((file) => file.id === id);
     if (!entry) throw new Error("This recent file is no longer available.");
     return openPath(entry.path);
+  });
+  ipcMain.handle("files:open-images", async (event) => {
+    trusted(event);
+    const result = await dialog.showOpenDialog(win, {
+      title: "Choose images in PDF page order",
+      properties: ["openFile", "multiSelections"],
+      filters: [
+        { name: "PNG and JPEG images", extensions: ["png", "jpg", "jpeg"] },
+      ],
+    });
+    if (result.canceled) return null;
+    if (result.filePaths.length < 1 || result.filePaths.length > 100)
+      throw new Error("Choose between 1 and 100 images.");
+    let total = 0;
+    const images = [];
+    for (const path of result.filePaths) {
+      const info = await stat(path);
+      if (!info.isFile() || info.size > 50 * 1024 * 1024)
+        throw new Error(`${basename(path)} exceeds the 50 MB image limit.`);
+      total += info.size;
+      if (total > 250 * 1024 * 1024)
+        throw new Error("Selected images exceed the 250 MB conversion limit.");
+      const bytes = new Uint8Array(await readFile(path));
+      const png =
+        bytes[0] === 0x89 &&
+        bytes[1] === 0x50 &&
+        bytes[2] === 0x4e &&
+        bytes[3] === 0x47;
+      const jpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+      if (!png && !jpeg)
+        throw new Error(`${basename(path)} is not a valid PNG or JPEG image.`);
+      images.push({ name: basename(path), bytes });
+    }
+    return images;
+  });
+  ipcMain.handle("files:convert-word", async (event) => {
+    trusted(event);
+    const picked = await dialog.showOpenDialog(win, {
+      title: "Choose a Word document",
+      properties: ["openFile"],
+      filters: [{ name: "Word documents", extensions: ["docx", "doc"] }],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return null;
+    const source = picked.filePaths[0];
+    const info = await stat(source);
+    if (!info.isFile() || info.size > 100 * 1024 * 1024)
+      throw new Error("Choose a Word document smaller than 100 MB.");
+    const folder = await mkdtemp(join(tmpdir(), "openpdf-word-"));
+    const output = join(
+      folder,
+      basename(source).replace(/\.(docx?|DOCX?)$/, "") + ".pdf",
+    );
+    let engine = "";
+    try {
+      const soffice = await firstAvailable([
+        "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+        "/opt/homebrew/bin/soffice",
+        "/usr/local/bin/soffice",
+      ]);
+      if (soffice) {
+        await runLocalTool(soffice, [
+          "--headless",
+          "--convert-to",
+          "pdf",
+          "--outdir",
+          folder,
+          source,
+        ]);
+        engine = "LibreOffice";
+      } else if (await firstAvailable(["/Applications/Pages.app"])) {
+        const script = `on run argv\nset inputPath to item 1 of argv\nset outputPath to item 2 of argv\ntell application "Pages"\nset theDocument to open POSIX file inputPath\nexport theDocument to POSIX file outputPath as PDF\nclose theDocument saving no\nend tell\nend run`;
+        await runLocalTool("/usr/bin/osascript", [
+          "-e",
+          script,
+          source,
+          output,
+        ]);
+        engine = "Apple Pages";
+      } else {
+        throw new Error(
+          "Word conversion requires LibreOffice or Apple Pages on this Mac.",
+        );
+      }
+      const converted = await readPDF(output);
+      const saved = await dialog.showSaveDialog(win, {
+        title: "Save converted PDF",
+        defaultPath: basename(output),
+        filters: [{ name: "PDF document", extensions: ["pdf"] }],
+      });
+      if (saved.canceled || !saved.filePath) return null;
+      await atomicSave(saved.filePath, converted.bytes, null);
+      return { ...(await openPath(saved.filePath)), engine };
+    } finally {
+      await rm(folder, { recursive: true, force: true });
+    }
   });
   ipcMain.handle(
     "files:save",

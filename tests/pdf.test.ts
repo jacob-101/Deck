@@ -6,6 +6,7 @@ import {
   extract,
   inspect,
   parsePageRange,
+  imagesToPDF,
 } from "../src/core/pdf";
 import { useDocument } from "../src/core/history";
 import type { AnnotationInput } from "../src/types";
@@ -37,6 +38,42 @@ describe("actual PDF operations", () => {
   it("creates a real searchable four-page document", () => {
     expect(inspect(sample).pages).toHaveLength(4);
     expect(pageText(sample)).toContain("A little less friction.");
+  });
+  it("converts multiple images to PDF without discarding source pixels", () => {
+    const landscape = new mupdf.Pixmap(
+      mupdf.ColorSpace.DeviceRGB,
+      [0, 0, 40, 20],
+      false,
+    );
+    const portrait = new mupdf.Pixmap(
+      mupdf.ColorSpace.DeviceRGB,
+      [0, 0, 20, 40],
+      false,
+    );
+    landscape.clear(220);
+    portrait.clear(120);
+    try {
+      const output = imagesToPDF([
+        { name: "landscape.jpg", bytes: landscape.asJPEG(95) },
+        { name: "portrait.png", bytes: portrait.asPNG() },
+      ]);
+      const pages = inspect(output).pages;
+      expect(pages).toHaveLength(2);
+      expect(pages[0].width).toBeGreaterThan(pages[0].height);
+      expect(pages[1].height).toBeGreaterThan(pages[1].width);
+      const document = new mupdf.PDFDocument(output);
+      const pageObject = document.findPage(0);
+      const imageObject = pageObject
+        .get("Resources", "XObject", "Im0")
+        .resolve();
+      expect(imageObject.get("Filter").asName()).toBe("DCTDecode");
+      imageObject.destroy();
+      pageObject.destroy();
+      document.destroy();
+    } finally {
+      landscape.destroy();
+      portrait.destroy();
+    }
   });
   it("rotates and independently duplicates pages", () => {
     const duplicated = edit(sample, { type: "duplicate", page: 0 });
@@ -369,10 +406,10 @@ describe("actual PDF operations", () => {
   });
   it("creates, renders, and repositions visible Stamp signature annotations", () => {
     const png1x1 = new Uint8Array([
-      137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0,
-      1, 0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68,
-      65, 84, 120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0,
-      0, 73, 69, 78, 68, 174, 66, 96, 130,
+      137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 13, 73, 72, 68, 82, 0, 0, 0, 1,
+      0, 0, 0, 1, 8, 6, 0, 0, 0, 31, 21, 196, 137, 0, 0, 0, 10, 73, 68, 65, 84,
+      120, 156, 99, 0, 1, 0, 0, 5, 0, 1, 13, 10, 45, 180, 0, 0, 0, 0, 73, 69,
+      78, 68, 174, 66, 96, 130,
     ]);
     const stamped = edit(sample, {
       type: "annotate",
@@ -435,7 +472,8 @@ describe("actual PDF operations", () => {
   });
 
   it("creates, renders, and updates FreeText with custom font, size, multiline and Unicode text", () => {
-    const unicodeText = "Line 1: Café & résumé — 100€\nLine 2: “Quotes” & ‘symbols’ ©";
+    const unicodeText =
+      "Line 1: Café & résumé — 100€\nLine 2: “Quotes” & ‘symbols’ ©";
     const annotated = edit(sample, {
       type: "annotate",
       page: 0,
@@ -491,7 +529,13 @@ describe("actual PDF operations", () => {
   });
 
   it("rejects repositioning geometry for unsupported annotation types", () => {
-    for (const type of ["Line", "Ink", "Highlight", "Underline", "StrikeOut"] as const) {
+    for (const type of [
+      "Line",
+      "Ink",
+      "Highlight",
+      "Underline",
+      "StrikeOut",
+    ] as const) {
       const annotated = edit(sample, {
         type: "annotate",
         page: 0,

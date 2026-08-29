@@ -3,6 +3,9 @@ import { mkdir, mkdtemp, readFile, writeFile, readdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import * as mupdf from "mupdf";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+const execFileAsync = promisify(execFile);
 
 function createScannedPDF() {
   const source = new mupdf.PDFDocument();
@@ -745,6 +748,103 @@ try {
   });
   await analysis.getByRole("button", { name: "Done", exact: true }).click();
   steps.push("Scanned image-only PDF detection and offline OCR recognition");
+
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].webContents.send("menu:command", "close"),
+  );
+  await expect(
+    page.getByRole("heading", { name: "Your PDFs. On your terms." }),
+  ).toBeVisible();
+  const imageOne = join(temp, "landscape.png");
+  const imageTwo = join(temp, "portrait.png");
+  const landscape = new mupdf.Pixmap(
+    mupdf.ColorSpace.DeviceRGB,
+    [0, 0, 120, 60],
+    false,
+  );
+  const portrait = new mupdf.Pixmap(
+    mupdf.ColorSpace.DeviceRGB,
+    [0, 0, 60, 120],
+    false,
+  );
+  landscape.clear(210);
+  portrait.clear(120);
+  await writeFile(imageOne, landscape.asPNG());
+  await writeFile(imageTwo, portrait.asPNG());
+  landscape.destroy();
+  portrait.destroy();
+  const imagePDF = join(temp, "images.pdf");
+  await app.evaluate(
+    ({ dialog }, paths) => {
+      dialog.showOpenDialog = async () => ({
+        canceled: false,
+        filePaths: paths.images,
+      });
+      dialog.showSaveDialog = async () => ({
+        canceled: false,
+        filePath: paths.output,
+      });
+    },
+    { images: [imageOne, imageTwo], output: imagePDF },
+  );
+  await page.getByRole("button", { name: /Images to PDF/ }).click();
+  await noBusy();
+  await ready();
+  const convertedImages = new mupdf.PDFDocument(
+    new Uint8Array(await readFile(imagePDF)),
+  );
+  expect(convertedImages.countPages()).toBe(2);
+  convertedImages.destroy();
+  await expect(page.locator(".status-left")).toContainText("All changes saved");
+  steps.push("Lossless multi-image PNG conversion to a saved two-page PDF");
+
+  await app.evaluate(({ BrowserWindow }) =>
+    BrowserWindow.getAllWindows()[0].webContents.send("menu:command", "close"),
+  );
+  await expect(
+    page.getByRole("heading", { name: "Your PDFs. On your terms." }),
+  ).toBeVisible();
+  const docxRoot = join(temp, "docx-source");
+  await mkdir(join(docxRoot, "_rels"), { recursive: true });
+  await mkdir(join(docxRoot, "word"), { recursive: true });
+  await writeFile(
+    join(docxRoot, "[Content_Types].xml"),
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>`,
+  );
+  await writeFile(
+    join(docxRoot, "_rels", ".rels"),
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`,
+  );
+  await writeFile(
+    join(docxRoot, "word", "document.xml"),
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>Word conversion proof</w:t></w:r></w:p><w:p><w:r><w:t>Tables, text, and images stay local.</w:t></w:r></w:p><w:sectPr/></w:body></w:document>`,
+  );
+  const word = join(temp, "word-proof.docx");
+  await execFileAsync("/usr/bin/zip", ["-q", "-r", word, "."], {
+    cwd: docxRoot,
+  });
+  const wordPDF = join(temp, "word-proof.pdf");
+  await app.evaluate(
+    ({ dialog }, paths) => {
+      dialog.showOpenDialog = async () => ({
+        canceled: false,
+        filePaths: [paths.word],
+      });
+      dialog.showSaveDialog = async () => ({
+        canceled: false,
+        filePath: paths.output,
+      });
+    },
+    { word, output: wordPDF },
+  );
+  await page.getByRole("button", { name: /Word to PDF/ }).click();
+  await noBusy();
+  await ready();
+  await expect(page.locator(".page-stage .textLayer")).toContainText(
+    "Word conversion proof",
+  );
+  expect((await readFile(wordPDF)).subarray(0, 5).toString()).toBe("%PDF-");
+  steps.push("Offline DOCX conversion to a saved PDF with selectable text");
   expect(errors).toEqual([]);
   await writeFile(
     join(output, "desktop-results.json"),

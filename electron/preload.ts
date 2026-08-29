@@ -3,6 +3,8 @@ import type { DesktopAPI, OpenFile } from "../src/types";
 const api: DesktopAPI = {
   open: () => ipcRenderer.invoke("files:open"),
   openRecent: (id) => ipcRenderer.invoke("files:recent", id),
+  openImages: () => ipcRenderer.invoke("files:open-images"),
+  convertWord: () => ipcRenderer.invoke("files:convert-word"),
   recents: () => ipcRenderer.invoke("files:recents"),
   clearRecents: () => ipcRenderer.invoke("files:clear-recents"),
   save: (bytes, id, name, saveAs) =>

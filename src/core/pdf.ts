@@ -151,9 +151,7 @@ export function inspect(bytes: Uint8Array): DocumentInfo {
                 id,
                 type: annotation.getType(),
                 contents: annotation.getContents(),
-                color: isFreeText
-                  ? appearance!.color
-                  : annotation.getColor(),
+                color: isFreeText ? appearance!.color : annotation.getColor(),
                 fontSize: isFreeText ? appearance!.size : null,
                 font: isFreeText ? appearance!.font : null,
                 rect: [rect[0], rect[1], rect[2], rect[3]],
@@ -281,7 +279,10 @@ function addAnnotation(page: mupdf.PDFPage, input: AnnotationInput) {
     throw new Error("Invalid annotation coordinates.");
   const annotation = page.createAnnotation(input.type);
   try {
-    if (input.type !== "FreeText" || (input.width !== undefined && input.width > 0)) {
+    if (
+      input.type !== "FreeText" ||
+      (input.width !== undefined && input.width > 0)
+    ) {
       annotation.setColor(input.color as mupdf.AnnotColor);
     }
     annotation.setFlags(mupdf.PDFAnnotation.IS_PRINT);
@@ -649,6 +650,64 @@ export function createSample(): Uint8Array {
     font.destroy();
     bold.destroy();
     serif.destroy();
+    doc.destroy();
+  }
+}
+
+export function imagesToPDF(images: { name: string; bytes: Uint8Array }[]) {
+  if (!Array.isArray(images) || images.length < 1 || images.length > 100)
+    throw new Error("Choose between 1 and 100 images.");
+  const doc = new mupdf.PDFDocument();
+  try {
+    for (const input of images) {
+      if (
+        !(input.bytes instanceof Uint8Array) ||
+        input.bytes.length < 16 ||
+        input.bytes.length > 50 * 1024 * 1024
+      )
+        throw new Error(`Could not read ${input.name || "an image"}.`);
+      let image: mupdf.Image;
+      try {
+        image = new mupdf.Image(input.bytes);
+      } catch {
+        throw new Error(
+          `${input.name || "An image"} is not a supported PNG or JPEG file.`,
+        );
+      }
+      let imageRef: mupdf.PDFObject | null = null;
+      let page: mupdf.PDFObject | null = null;
+      try {
+        const pixelsWide = image.getWidth();
+        const pixelsHigh = image.getHeight();
+        if (
+          pixelsWide < 1 ||
+          pixelsHigh < 1 ||
+          pixelsWide * pixelsHigh > 100_000_000
+        )
+          throw new Error(
+            `${input.name || "An image"} has invalid dimensions.`,
+          );
+        const maxWidth = pixelsWide >= pixelsHigh ? 792 : 612;
+        const maxHeight = pixelsWide >= pixelsHigh ? 612 : 792;
+        const fit = Math.min(maxWidth / pixelsWide, maxHeight / pixelsHigh);
+        const width = Math.max(1, pixelsWide * fit);
+        const height = Math.max(1, pixelsHigh * fit);
+        imageRef = doc.addImage(image);
+        page = doc.addPage(
+          [0, 0, width, height],
+          0,
+          { XObject: { Im0: imageRef } },
+          `q ${width} 0 0 ${height} 0 0 cm /Im0 Do Q`,
+        );
+        doc.insertPage(-1, page);
+      } finally {
+        page?.destroy();
+        imageRef?.destroy();
+        image.destroy();
+      }
+    }
+    return serialize(doc);
+  } finally {
     doc.destroy();
   }
 }

@@ -1,5 +1,6 @@
 export const MAX_FILE_SIZE = 50 * 1024 * 1024;
 export type OpenFile = { id: string | null; name: string; bytes: Uint8Array };
+export type ImageFile = { name: string; bytes: Uint8Array };
 export type RecentFile = { id: string; name: string; date: number };
 export type SaveResult = { id: string; name: string } | null;
 export type OCRResult = {
@@ -11,6 +12,8 @@ export type OCRResult = {
 export type DesktopAPI = {
   open(): Promise<OpenFile | null>;
   openRecent(id: string): Promise<OpenFile>;
+  openImages(): Promise<ImageFile[] | null>;
+  convertWord(): Promise<(OpenFile & { engine: string }) | null>;
   recents(): Promise<RecentFile[]>;
   clearRecents(): Promise<void>;
   save(

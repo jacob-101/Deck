@@ -82,7 +82,10 @@ import {
 import { Settings, type SettingsSection } from "./components/Settings";
 import { APP_VERSION, BrandIcon } from "./components/Brand";
 import { AnnotationEditor } from "./components/AnnotationEditor";
-import { SignatureModal, type SignatureResult } from "./components/SignatureModal";
+import {
+  SignatureModal,
+  type SignatureResult,
+} from "./components/SignatureModal";
 import { DocumentDetails } from "./components/DocumentDetails";
 import { DocumentAnalysis } from "./components/DocumentAnalysis";
 import { DocumentOutline } from "./components/DocumentOutline";
@@ -816,7 +819,16 @@ export default function App() {
     };
     window.addEventListener("keydown", keydown);
     return () => window.removeEventListener("keydown", keydown);
-  }, [count, modal, settings, editor, details, selectedAnnotationId, pageInfo, page]);
+  }, [
+    count,
+    modal,
+    settings,
+    editor,
+    details,
+    selectedAnnotationId,
+    pageInfo,
+    page,
+  ]);
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
       if (dirty && !window.desktop) event.preventDefault();
@@ -948,6 +960,37 @@ export default function App() {
     setMode((current) => (current === "organize" ? "read" : current));
   };
   const canEdit = !!pdf && !busy;
+  const convertImages = () =>
+    void perform("Converting images…", async () => {
+      if (!window.desktop)
+        throw new Error("Image conversion is available in the Mac app.");
+      const images = await window.desktop.openImages();
+      if (!images) return;
+      const result = await pdfEngine.images(images);
+      const saved = await window.desktop.save(
+        result.bytes,
+        null,
+        images.length === 1
+          ? images[0].name.replace(/\.(png|jpe?g)$/i, "") + ".pdf"
+          : "Images.pdf",
+        true,
+      );
+      if (!saved) return;
+      state.load(result.bytes, result.info, saved.name, saved.id);
+      applyDocumentDefaults();
+      notify(
+        `${images.length} image${images.length === 1 ? "" : "s"} converted without downsampling.`,
+      );
+    });
+  const convertWord = () =>
+    void perform("Converting Word document…", async () => {
+      if (!window.desktop)
+        throw new Error("Word conversion is available in the Mac app.");
+      const converted = await window.desktop.convertWord();
+      if (!converted) return;
+      await loadFile(converted);
+      notify(`Word document converted locally with ${converted.engine}.`);
+    });
   return (
     <div
       className={`app ${dragging ? "dragging-file" : ""}`}
@@ -1731,6 +1774,22 @@ export default function App() {
                 <FolderOpen size={19} /> Open a PDF <kbd>⌘ O</kbd>
               </button>
               <span className="drop-hint">or drop a document anywhere</span>
+              <div className="welcome-converters" aria-label="Convert to PDF">
+                <button disabled={!!busy} onClick={convertImages}>
+                  <FilePlus2 size={17} />
+                  <span>
+                    <strong>Images to PDF</strong>
+                    PNG or JPEG · original pixels
+                  </span>
+                </button>
+                <button disabled={!!busy} onClick={convertWord}>
+                  <FileText size={17} />
+                  <span>
+                    <strong>Word to PDF</strong>
+                    DOC or DOCX · local conversion
+                  </span>
+                </button>
+              </div>
               <button
                 className="sample-button"
                 disabled={!!busy}
