@@ -36,7 +36,7 @@ The application is generated in `release/mac-arm64/OpenPDF Studio.app` on Apple 
 - High-quality PNG/JPEG-to-PDF conversion supports 1–100 images with a visual preparation workspace. Crop with an adjustable frame, rotate in 90° steps, remove pages, add more images, and arrange page order before export. Crop and rotation are stored as PDF geometry, so original JPEG compression and source pixels stay embedded without downsampling or recompression.
 - Offline DOC/DOCX-to-PDF conversion uses an installed LibreOffice engine, with Apple Pages as a fallback. Converted PDFs open immediately with selectable text. Layout fidelity still depends on the fonts and document features available to the installed converter.
 - Standard PDF highlights, underline, strike-through, ink, rectangles, ellipses, arrows, text boxes, sticky notes, and visible signature stamps. Select text while a markup tool is active; drag to draw; click to place a note or text box.
-- **Add Text (FreeText):** place text boxes anywhere on the page with customizable font sizes (10–32 pt), font families (Helvetica, Courier, Times), dedicated text colors, multiline/Unicode characters, and interactive move/resize bounding boxes on the page canvas.
+- **Add Text (FreeText):** place text boxes anywhere on the page with customizable font sizes (10–32 pt), font families (Helvetica, Courier, Times), dedicated text colors, transparent or colored PDF background fills, multiline/Unicode characters, and interactive move/resize bounding boxes on the page canvas.
 - **Sign (Stamp):** draw a signature, type in elegant script styles, or import PNG/JPEG images (with automatic background transparency removal). Move and resize signatures with proportional aspect-ratio preservation. Save signatures locally with explicit opt-in.
 - Annotation list, jump to annotated page, edit text/comments and color, adjust shape line weight, remove annotations. Locked annotations cannot be edited or deleted.
 - Embedded PDF table of contents, including nested sections and page destinations that follow page reordering. External destinations are not opened.
@@ -78,7 +78,7 @@ Viewer defaults apply when opening a document. Appearance and annotation default
 
 ## Limits and cautions
 
-This is the first reader/organizer/annotation release, not full Acrobat parity. Existing text/image editing, OCR, scanner capture, form creation/filling, cryptographic signatures, Office conversion, compression and redaction are not implemented. Drawing over text does **not** redact it.
+This is not full Acrobat parity. Existing text/image editing, scanner capture, form creation/filling, cryptographic signatures, compression, and redaction are not implemented. Drawing over text does **not** redact it.
 
 - Inputs: PDF only, up to 50 MB and 500 pages. Password-protected PDFs are rejected.
 - History: at most 40 revisions, normally within 96 MB; at least the current and previous revisions are retained. Closing the document clears history.

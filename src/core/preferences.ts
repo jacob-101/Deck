@@ -36,6 +36,22 @@ export const TEXT_COLOR_NAMES = [
   "Plum",
   "Slate",
 ];
+export const TEXT_BACKGROUND_COLORS = [
+  "none",
+  "#ffffff",
+  "#fff1bd",
+  "#dceee3",
+  "#dce9f7",
+  "#f5dce1",
+];
+export const TEXT_BACKGROUND_NAMES = [
+  "None",
+  "White",
+  "Cream",
+  "Mint",
+  "Sky",
+  "Blush",
+];
 
 export const THEMES = [
   {

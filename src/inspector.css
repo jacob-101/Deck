@@ -6,29 +6,95 @@
 }
 .analysis-dialog {
   width: min(420px, calc(100vw - 48px));
-  max-height: min(680px, calc(100dvh - 96px));
+  max-height: min(760px, calc(100dvh - 64px));
   padding: 21px;
 }
 .analysis-dialog .modal-heading {
   margin-bottom: 13px;
+}
+.analysis-dialog.ocr-complete > .modal-heading,
+.analysis-dialog.ocr-complete > .inspector-eyebrow,
+.analysis-dialog.ocr-complete > h2,
+.analysis-dialog.ocr-complete > h2 + p {
+  display: none;
 }
 .analysis-dialog > p {
   margin: 8px 0 13px;
   overflow-wrap: anywhere;
 }
 .analysis-dialog .analysis-summary {
-  margin: 12px 0;
-  padding: 12px 13px;
+  margin: 10px 0;
+  padding: 11px 13px;
 }
 .analysis-dialog .analysis-summary strong {
   font-size: 16px;
 }
+.analysis-findings {
+  margin: 11px 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--soft);
+}
+.analysis-findings summary {
+  min-height: 57px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+.analysis-findings summary::-webkit-details-marker {
+  display: none;
+}
+.analysis-findings summary > span:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.analysis-findings summary strong {
+  font-size: 15px;
+}
+.analysis-findings summary small {
+  color: var(--muted);
+  font-size: 10px;
+}
+.analysis-findings-action {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--green);
+  font-size: 10px;
+  white-space: nowrap;
+}
+.analysis-findings[open] .analysis-findings-action svg {
+  transform: rotate(90deg);
+}
+.analysis-dialog .document-metadata {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+  padding: 0 12px;
+  border-top: 1px solid var(--line);
+}
 .analysis-dialog .document-metadata > div {
-  grid-template-columns: 86px 1fr;
+  display: block;
+  min-width: 0;
   padding: 8px 0;
 }
+.analysis-dialog .document-metadata dt {
+  margin-bottom: 3px;
+}
+.analysis-dialog .document-metadata dd {
+  font-size: 10px;
+}
+.analysis-findings .analysis-caveat {
+  padding: 0 12px 10px;
+}
 .analysis-dialog .analysis-caveat {
-  margin: 11px 0 12px;
+  margin: 0;
   line-height: 1.55;
 }
 .analysis-dialog .ocr-workflow {
@@ -63,6 +129,9 @@
   max-height: 180px;
   margin-bottom: 10px;
   padding: 11px;
+}
+.analysis-dialog.ocr-complete .markdown-preview {
+  max-height: 140px;
 }
 .analysis-dialog .details-privacy {
   margin-top: 13px;
@@ -123,6 +192,69 @@
   border-radius: 6px;
   margin-left: 3px;
   cursor: pointer;
+}
+.editor-background {
+  margin-top: 17px;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+}
+.editor-background > label {
+  margin-bottom: 8px;
+}
+.editor-background small {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.background-colors {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.background-colors button {
+  width: 27px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, var(--line));
+  border-radius: 7px;
+  color: #29312d;
+  box-shadow: inset 0 0 0 1px #ffffff66;
+}
+.background-colors button[aria-pressed="true"] {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
+}
+.background-colors .no-fill {
+  background:
+    linear-gradient(
+      135deg,
+      transparent 46%,
+      #ba5c50 47%,
+      #ba5c50 53%,
+      transparent 54%
+    ),
+    var(--surface);
+  color: var(--muted);
+}
+.background-colors input[type="color"] {
+  width: 30px;
+  height: 30px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  cursor: pointer;
+}
+.text-modal-background {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
 }
 .editor-weight {
   width: 100px;

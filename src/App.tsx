@@ -77,6 +77,8 @@ import { parsePageRange } from "./core/ranges";
 import {
   ANNOTATION_COLORS,
   COLOR_NAMES,
+  TEXT_BACKGROUND_COLORS,
+  TEXT_BACKGROUND_NAMES,
   TEXT_COLORS,
   TEXT_COLOR_NAMES,
   usePreferences,
@@ -248,6 +250,7 @@ export default function App() {
     String(preferences.defaultFontSize || 14),
   );
   const [textModalFont, setTextModalFont] = useState("Helv");
+  const [textModalFill, setTextModalFill] = useState("none");
   const dialog = useRef<HTMLDialogElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
@@ -451,6 +454,8 @@ export default function App() {
     if (modal) {
       setInput(modal.kind === "extract" ? String(page + 1) : "");
       setModalError("");
+      if (modal.kind === "text" && modal.type === "FreeText")
+        setTextModalFill("none");
       dialog.current?.showModal();
     } else dialog.current?.close();
   }, [modal, page]);
@@ -892,6 +897,13 @@ export default function App() {
         contents: input.trim(),
         fontSize: isFreeText ? Number(textModalFontSize) : undefined,
         font: isFreeText ? textModalFont : undefined,
+        fillColor:
+          isFreeText && textModalFill !== "none"
+            ? [1, 3, 5].map(
+                (offset) =>
+                  parseInt(textModalFill.slice(offset, offset + 2), 16) / 255,
+              )
+            : null,
       });
       setModal(null);
       setTool("select");
@@ -2170,6 +2182,42 @@ export default function App() {
                           {textModalColor === swatch && <Check size={12} />}
                         </button>
                       ))}
+                    </div>
+                  </div>
+                  <div className="text-modal-background">
+                    <span>Background:</span>
+                    <div className="background-colors">
+                      {TEXT_BACKGROUND_COLORS.map((swatch, index) => (
+                        <button
+                          key={swatch}
+                          type="button"
+                          className={swatch === "none" ? "no-fill" : ""}
+                          aria-label={`${TEXT_BACKGROUND_NAMES[index]} background`}
+                          aria-pressed={textModalFill === swatch}
+                          style={
+                            swatch === "none"
+                              ? undefined
+                              : { background: swatch }
+                          }
+                          onClick={() => setTextModalFill(swatch)}
+                        >
+                          {swatch === "none" ? (
+                            <X size={12} />
+                          ) : (
+                            textModalFill === swatch && <Check size={12} />
+                          )}
+                        </button>
+                      ))}
+                      <input
+                        type="color"
+                        aria-label="Custom text box background"
+                        value={
+                          textModalFill === "none" ? "#ffffff" : textModalFill
+                        }
+                        onChange={(event) =>
+                          setTextModalFill(event.target.value)
+                        }
+                      />
                     </div>
                   </div>
                 </div>

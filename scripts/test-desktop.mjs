@@ -186,7 +186,7 @@ try {
   const analysisBounds = await analysis.boundingBox();
   if (!analysisBounds) throw new Error("Document Analysis bounds unavailable");
   expect(analysisBounds.width).toBeLessThanOrEqual(422);
-  expect(analysisBounds.height).toBeLessThanOrEqual(682);
+  expect(analysisBounds.height).toBeLessThanOrEqual(762);
   await expect(analysis).toContainText("Text-based PDF", { timeout: 30000 });
   await expect(analysis.locator("#markdown-preview")).toContainText(
     "A little less friction",
@@ -200,6 +200,14 @@ try {
   await expect(analysis.locator("#markdown-preview")).toContainText(
     "A little less friction",
   );
+  const completedAnalysisMetrics = await analysis.evaluate((element) => ({
+    clientHeight: element.clientHeight,
+    scrollHeight: element.scrollHeight,
+  }));
+  expect(
+    completedAnalysisMetrics.scrollHeight -
+      completedAnalysisMetrics.clientHeight,
+  ).toBeLessThanOrEqual(2);
   const copyOCR = analysis.getByRole("button", { name: "Copy OCR text" });
   await copyOCR.click();
   await expect(copyOCR).toContainText("Copied");
@@ -485,6 +493,7 @@ try {
   await textModal.getByLabel("Font size").selectOption("18");
   await textModal.getByLabel("Font family").selectOption("Cour");
   await textModal.getByRole("button", { name: "Charcoal" }).click();
+  await textModal.getByRole("button", { name: "Cream background" }).click();
   await textModal
     .getByLabel("Annotation text")
     .fill("Café Approval — 100€\nReviewed & Accepted ©");
@@ -497,6 +506,26 @@ try {
   await expect(page.locator(".note-card").last()).toContainText(
     "Café Approval — 100€",
   );
+  await page
+    .locator(".note-card")
+    .last()
+    .getByRole("button", { name: /Edit annotation/ })
+    .click();
+  await expect(
+    annotationEditor.getByRole("button", { name: "Cream background" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await annotationEditor
+    .getByRole("button", { name: "Sky background" })
+    .click();
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "text-box-background.png"),
+  });
+  await annotationEditor
+    .getByRole("button", { name: "Update annotation" })
+    .click();
+  await noBusy();
+  await ready();
 
   // Move Text Box via page interaction
   const freeTextHandle = page.locator(
@@ -519,7 +548,7 @@ try {
   await page.getByRole("button", { name: "Redo", exact: true }).click();
   await ready();
   steps.push(
-    "Add text with custom font size, Courier family, Unicode/multiline text, and move interaction",
+    "Add text with custom font, Unicode, persistent background fill, and move interaction",
   );
 
   // Signature workflow (Sign / Stamp)

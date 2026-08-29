@@ -77,6 +77,7 @@ export type AnnotationInput = {
   quads?: number[][];
   fontSize?: number;
   font?: string;
+  fillColor?: number[] | null;
   imageBytes?: Uint8Array;
 };
 export type AnnotationInfo = {
@@ -89,6 +90,7 @@ export type AnnotationInfo = {
   locked: boolean;
   fontSize?: number | null;
   font?: string | null;
+  fillColor?: number[] | null;
   rect?: number[];
 };
 export type AnnotationPatch = {
@@ -97,6 +99,7 @@ export type AnnotationPatch = {
   width?: number;
   fontSize?: number;
   font?: string;
+  fillColor?: number[] | null;
   rect?: number[];
 };
 export type PageInfo = {

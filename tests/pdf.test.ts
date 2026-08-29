@@ -540,6 +540,7 @@ describe("actual PDF operations", () => {
         contents: unicodeText,
         fontSize: 18,
         font: "Cour",
+        fillColor: [1, 0.94, 0.65],
       },
     });
 
@@ -549,6 +550,7 @@ describe("actual PDF operations", () => {
     expect(annot.fontSize).toBe(18);
     expect(annot.font).toBe("Cour");
     expect(annot.color[0]).toBeCloseTo(0.12);
+    expect(annot.fillColor?.[1]).toBeCloseTo(0.94);
 
     const doc = new mupdf.PDFDocument(annotated);
     const page = doc.loadPage(0);
@@ -574,12 +576,14 @@ describe("actual PDF operations", () => {
       patch: {
         contents: "Updated multiline\nSecond line",
         fontSize: 24,
+        fillColor: null,
         rect: [60, 110, 400, 250],
       },
     });
     const updatedAnnot = inspect(updated).pages[0].annotations[0];
     expect(updatedAnnot.contents).toBe("Updated multiline\nSecond line");
     expect(updatedAnnot.fontSize).toBe(24);
+    expect(updatedAnnot.fillColor).toBeNull();
     expect(updatedAnnot.rect).toEqual([60, 110, 400, 250]);
   });
 

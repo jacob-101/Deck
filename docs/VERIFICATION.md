@@ -7,7 +7,8 @@
 - 29 Electron desktop scenarios, run against both the source build and the packaged Apple Silicon `.app`, including an image-only scanned PDF recognized by the bundled Apple Vision helper, verified native clipboard copying of OCR text, lossless ordered image conversion, and offline DOCX conversion with selectable output text.
 - Image conversion verifies the visual crop/rotate/order workflow, cropped pixel output, landscape/portrait page sizing, and preservation of JPEG `DCTDecode` streams rather than rasterizing them again. Word conversion verifies a standards-based DOCX fixture through the installed LibreOffice engine and native PDF saving.
 - Local PDF Inspector classification runs in a dedicated Web Worker. The packaged Apple Vision helper performs accurate offline OCR, and native Markdown export was verified against a temporary `.md` file. The drawing regression check confirms annotation updates never remove the visible page stage.
-- Full verification of Add Text (FreeText) with custom font sizes, font families (`Helv`, `Cour`), text colors, multiline/Unicode text (`Café Approval — 100€ ©`), interactive move/resize bounding box on page canvas, and undo/redo.
+- Full verification of Add Text (FreeText) with custom font sizes, font families (`Helv`, `Cour`), text colors, transparent and colored PDF background fills, multiline/Unicode text (`Café Approval — 100€ ©`), interactive move/resize bounding box on page canvas, and undo/redo.
+- Completed OCR results collapse secondary document findings and fit without dialog-level scrolling; the recognized-text preview retains its own bounded scroll area.
 - Full verification of Sign (Stamp) workflow across Draw, Type, and Import modes, aspect-ratio preserved corner resizing, opt-in local storage error handling, deletion controls, image format/pixel limits (PNG/JPEG, max 5 MB / 4096px), and persistent rendering in saved PDFs without fallback stamps.
 - MuPDF `setRect` restriction verification: confirmed `setRect()` is safely executed on `FreeText`, `Stamp`, `Square`, `Circle`, and `Text` annotations while guarded against unsupported stroke annotations (`Line`, `Ink`, `Highlight`, etc.).
 - Gstack browser verification at 980 × 650: sample PDF opened, rendered with selectable text, interactive controls present, no browser console errors. Version 0.2 Settings and welcome layouts also checked at the minimum size.
@@ -46,7 +47,7 @@ The desktop harness supplies native dialog choices but calls the real preload, I
 
 ## Not verified
 
-Physical printing, Finder associations after installation into Applications, Intel builds, Apple signing/notarization, screen-reader usability, and a large external PDF compatibility corpus. Forms, PDF/A preservation, certificate signatures, OCR, scanning, Office conversion, redaction, and editing existing PDF text are outside this release. See README for size and history limits.
+Physical printing, Finder associations after installation into Applications, Intel builds, Apple signing/notarization, screen-reader usability, and a large external PDF compatibility corpus. Forms, PDF/A preservation, certificate signatures, scanning, redaction, and editing existing PDF text are outside this release. See README for size and history limits.
 
 ## Fixes found during verification
 

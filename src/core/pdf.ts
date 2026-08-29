@@ -144,6 +144,7 @@ export function inspect(bytes: Uint8Array): DocumentInfo {
               const appearance = isFreeText
                 ? annotation.getDefaultAppearance()
                 : null;
+              const background = isFreeText ? annotation.getColor() : [];
               const rect = annotation.hasRect()
                 ? annotation.getRect()
                 : [0, 0, 0, 0];
@@ -154,6 +155,7 @@ export function inspect(bytes: Uint8Array): DocumentInfo {
                 color: isFreeText ? appearance!.color : annotation.getColor(),
                 fontSize: isFreeText ? appearance!.size : null,
                 font: isFreeText ? appearance!.font : null,
+                fillColor: isFreeText && background.length ? background : null,
                 rect: [rect[0], rect[1], rect[2], rect[3]],
                 width: annotation.hasBorder()
                   ? annotation.getBorderWidth()
@@ -193,9 +195,15 @@ function updateAnnotation(
     !Object.keys(patch).length ||
     Object.keys(patch).some(
       (key) =>
-        !["contents", "color", "width", "fontSize", "font", "rect"].includes(
-          key,
-        ),
+        ![
+          "contents",
+          "color",
+          "width",
+          "fontSize",
+          "font",
+          "fillColor",
+          "rect",
+        ].includes(key),
     )
   )
     throw new Error("No annotation changes supplied.");
@@ -212,6 +220,17 @@ function updateAnnotation(
       !patch.color.every((c) => Number.isFinite(c) && c >= 0 && c <= 1))
   )
     throw new Error("Choose a valid annotation color.");
+  if (
+    patch.fillColor !== undefined &&
+    (type !== "FreeText" ||
+      (patch.fillColor !== null &&
+        (!Array.isArray(patch.fillColor) ||
+          patch.fillColor.length !== 3 ||
+          !patch.fillColor.every(
+            (c) => Number.isFinite(c) && c >= 0 && c <= 1,
+          ))))
+  )
+    throw new Error("Choose a valid text box background color.");
   if (
     patch.width !== undefined &&
     (!Number.isFinite(patch.width) ||
@@ -265,6 +284,8 @@ function updateAnnotation(
       throw new Error(`Repositioning ${type} annotations is not supported.`);
     }
   }
+  if (patch.fillColor !== undefined)
+    annotation.setColor((patch.fillColor ?? []) as unknown as mupdf.AnnotColor);
   if (patch.width !== undefined) annotation.setBorderWidth(patch.width);
   annotation.setModificationDate(new Date());
   annotation.update();
@@ -279,10 +300,7 @@ function addAnnotation(page: mupdf.PDFPage, input: AnnotationInput) {
     throw new Error("Invalid annotation coordinates.");
   const annotation = page.createAnnotation(input.type);
   try {
-    if (
-      input.type !== "FreeText" ||
-      (input.width !== undefined && input.width > 0)
-    ) {
+    if (input.type !== "FreeText") {
       annotation.setColor(input.color as mupdf.AnnotColor);
     }
     annotation.setFlags(mupdf.PDFAnnotation.IS_PRINT);
@@ -296,6 +314,8 @@ function addAnnotation(page: mupdf.PDFPage, input: AnnotationInput) {
         input.color as mupdf.AnnotColor,
       );
       annotation.setRect(input.rect as mupdf.Rect);
+      if (input.fillColor)
+        annotation.setColor(input.fillColor as mupdf.AnnotColor);
       if (input.width !== undefined && input.width > 0) {
         annotation.setBorderWidth(input.width);
       } else {

@@ -4,11 +4,18 @@ import type { AnnotationInfo, AnnotationPatch } from "../types";
 import {
   ANNOTATION_COLORS,
   COLOR_NAMES,
+  TEXT_BACKGROUND_COLORS,
+  TEXT_BACKGROUND_NAMES,
   TEXT_COLORS,
   TEXT_COLOR_NAMES,
 } from "../core/preferences";
 import { annotationHex, annotationName } from "../core/annotation-style";
 import { IconButton } from "./Button";
+
+const toPDFColor = (value: string) =>
+  [1, 3, 5].map(
+    (offset) => parseInt(value.slice(offset, offset + 2), 16) / 255,
+  );
 
 export function AnnotationEditor({
   annotation,
@@ -28,6 +35,10 @@ export function AnnotationEditor({
   const [width, setWidth] = useState(String(annotation.width ?? 2));
   const [fontSize, setFontSize] = useState(String(annotation.fontSize ?? 14));
   const [font, setFont] = useState(annotation.font ?? "Helv");
+  const originalFill = annotation.fillColor
+    ? annotationHex(annotation.fillColor)
+    : "none";
+  const [fillColor, setFillColor] = useState(originalFill);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -42,7 +53,8 @@ export function AnnotationEditor({
       (!width.trim() || Number(width) !== annotation.width)) ||
     (isFreeText &&
       (Number(fontSize) !== (annotation.fontSize ?? 14) ||
-        font !== (annotation.font ?? "Helv")));
+        font !== (annotation.font ?? "Helv") ||
+        fillColor !== originalFill));
 
   useEffect(() => {
     dialog.current?.showModal();
@@ -50,7 +62,7 @@ export function AnnotationEditor({
 
   useEffect(() => {
     setError("");
-  }, [contents, color, width, fontSize, font]);
+  }, [contents, color, width, fontSize, font, fillColor]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -96,6 +108,8 @@ export function AnnotationEditor({
     if (isFreeText && Number(fontSize) !== (annotation.fontSize ?? 14))
       patch.fontSize = Number(fontSize);
     if (isFreeText && font !== (annotation.font ?? "Helv")) patch.font = font;
+    if (isFreeText && fillColor !== originalFill)
+      patch.fillColor = fillColor === "none" ? null : toPDFColor(fillColor);
 
     if (!Object.keys(patch).length) return;
     setBusy(true);
@@ -245,9 +259,7 @@ export function AnnotationEditor({
 
           <div className="editor-style-row" style={{ marginTop: "10px" }}>
             <div>
-              <label>
-                {isFreeText ? "Text color" : "Color"}
-              </label>
+              <label>{isFreeText ? "Text color" : "Color"}</label>
               <div className="editor-colors">
                 {paletteColors.map((item, index) => (
                   <button
@@ -287,6 +299,41 @@ export function AnnotationEditor({
               </label>
             )}
           </div>
+          {isFreeText && (
+            <div className="editor-background">
+              <label>Background</label>
+              <div className="background-colors">
+                {TEXT_BACKGROUND_COLORS.map((item, index) => (
+                  <button
+                    type="button"
+                    key={item}
+                    className={item === "none" ? "no-fill" : ""}
+                    aria-label={`${TEXT_BACKGROUND_NAMES[index]} background`}
+                    aria-pressed={fillColor === item}
+                    style={item === "none" ? undefined : { background: item }}
+                    onClick={() => setFillColor(item)}
+                  >
+                    {item === "none" ? (
+                      <X size={13} />
+                    ) : (
+                      fillColor === item && <Check size={13} />
+                    )}
+                  </button>
+                ))}
+                <input
+                  type="color"
+                  aria-label="Custom text box background"
+                  value={fillColor === "none" ? "#ffffff" : fillColor}
+                  onChange={(event) => setFillColor(event.target.value)}
+                />
+              </div>
+              <small>
+                {fillColor === "none"
+                  ? "Transparent — the page shows through."
+                  : "The fill is saved inside the PDF."}
+              </small>
+            </div>
+          )}
         </fieldset>
         {error && (
           <p className="modal-error" role="alert">

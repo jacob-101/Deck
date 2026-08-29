@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PdfProcessResult } from "@firecrawl/pdf-inspector-wasm";
 import {
   Check,
+  ChevronRight,
   Copy,
   Download,
   FileSearch,
@@ -39,6 +40,7 @@ export function DocumentAnalysis({
   const [ocrBusy, setOcrBusy] = useState(false);
   const [language, setLanguage] = useState("auto");
   const [copied, setCopied] = useState(false);
+  const [findingsOpen, setFindingsOpen] = useState(true);
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
@@ -47,6 +49,7 @@ export function DocumentAnalysis({
     setResult(null);
     setError("");
     setNotice("");
+    setFindingsOpen(true);
     void analyzePDF(bytes, controller.signal)
       .then(setResult)
       .catch((cause) => {
@@ -54,6 +57,9 @@ export function DocumentAnalysis({
       });
     return () => controller.abort();
   }, [bytes, attempt]);
+  useEffect(() => {
+    if (ocr) setFindingsOpen(false);
+  }, [ocr]);
   const markdown =
     ocr && result
       ? mergeOCRMarkdown(result.markdown || "", ocr, result.pageCount)
@@ -145,7 +151,7 @@ export function DocumentAnalysis({
   return (
     <dialog
       ref={dialog}
-      className="modal document-details analysis-dialog"
+      className={`modal document-details analysis-dialog ${ocr ? "ocr-complete" : ""}`}
       aria-label="Document analysis"
       onCancel={(e) => {
         if (saving) e.preventDefault();
@@ -175,39 +181,51 @@ export function DocumentAnalysis({
       )}
       {result && (
         <>
-          <div className="analysis-summary">
-            <strong>{labels[result.pdfType] || "Unclassified PDF"}</strong>
-            <span>
-              {result.pageCount} pages · {Math.round(result.confidence * 100)}%
-              classification confidence
-            </span>
-          </div>
-          <dl className="document-metadata">
-            <div>
-              <dt>May need OCR</dt>
-              <dd>{pages(result.pagesNeedingOcr)}</dd>
-            </div>
-            <div>
-              <dt>Tables detected on</dt>
-              <dd>{pages(result.layout.pagesWithTables)}</dd>
-            </div>
-            <div>
-              <dt>Columns detected on</dt>
-              <dd>{pages(result.layout.pagesWithColumns)}</dd>
-            </div>
-            <div>
-              <dt>Text encoding</dt>
-              <dd>
-                {result.hasEncodingIssues
-                  ? "Possible encoding issues — review extracted text"
-                  : "No issues detected"}
-              </dd>
-            </div>
-          </dl>
-          <p className="analysis-caveat">
-            Classification is an estimate. Use offline OCR for scanned pages,
-            then review the recognized text before relying on it.
-          </p>
+          <details
+            className="analysis-findings"
+            open={findingsOpen}
+            onToggle={(event) => setFindingsOpen(event.currentTarget.open)}
+          >
+            <summary>
+              <span>
+                <strong>{labels[result.pdfType] || "Unclassified PDF"}</strong>
+                <small>
+                  {result.pageCount} pages ·{" "}
+                  {Math.round(result.confidence * 100)}% confidence
+                </small>
+              </span>
+              <span className="analysis-findings-action">
+                {ocr ? "Analysis details" : "Document details"}
+                <ChevronRight size={15} />
+              </span>
+            </summary>
+            <dl className="document-metadata">
+              <div>
+                <dt>May need OCR</dt>
+                <dd>{pages(result.pagesNeedingOcr)}</dd>
+              </div>
+              <div>
+                <dt>Tables</dt>
+                <dd>{pages(result.layout.pagesWithTables)}</dd>
+              </div>
+              <div>
+                <dt>Columns</dt>
+                <dd>{pages(result.layout.pagesWithColumns)}</dd>
+              </div>
+              <div>
+                <dt>Text encoding</dt>
+                <dd>
+                  {result.hasEncodingIssues
+                    ? "Review extracted text"
+                    : "No issues detected"}
+                </dd>
+              </div>
+            </dl>
+            <p className="analysis-caveat">
+              Classification is an estimate. Review recognized text before
+              relying on it.
+            </p>
+          </details>
           <section className="ocr-workflow" aria-labelledby="ocr-title">
             <div className="ocr-workflow-intro">
               <div className="ocr-mark" aria-hidden="true">
