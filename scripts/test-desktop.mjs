@@ -69,6 +69,7 @@ page.on("console", (message) => {
   }
 });
 const steps = [];
+const performanceMetrics = {};
 const ready = () =>
   expect(page.locator(".page-stage .pdf-page")).toHaveAttribute(
     "data-ready",
@@ -447,7 +448,26 @@ try {
   await page.getByRole("button", { name: "Redo", exact: true }).click();
   await ready();
   await expect(page.locator(".note-card")).toHaveCount(2);
-  steps.push("Drawing and undo/redo");
+  await page.getByRole("button", { name: "Draw", exact: true }).click();
+  box = await page.locator(".page-stage .pdf-page").boundingBox();
+  const strokeStarted = performance.now();
+  await page.mouse.move(box.x + 45, box.y + 75);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 360, box.y + 190, { steps: 240 });
+  await page.mouse.up();
+  performanceMetrics.longStrokeMs = Math.round(
+    performance.now() - strokeStarted,
+  );
+  // Playwright sends each mouse step over the Electron debugging protocol, so
+  // this is a hang guard rather than a frame-time benchmark.
+  expect(performanceMetrics.longStrokeMs).toBeLessThan(6000);
+  await noBusy();
+  await ready();
+  await expect(page.locator(".note-card")).toHaveCount(3);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await ready();
+  await expect(page.locator(".note-card")).toHaveCount(2);
+  steps.push("Responsive 240-point freehand stroke, drawing, and undo/redo");
   await page
     .getByRole("button", { name: "Edit annotation 2 on page 1", exact: true })
     .click();
@@ -494,9 +514,16 @@ try {
   await textModal.getByLabel("Font family").selectOption("Cour");
   await textModal.getByRole("button", { name: "Charcoal" }).click();
   await textModal.getByRole("button", { name: "Cream background" }).click();
-  await textModal
-    .getByLabel("Annotation text")
-    .fill("Café Approval — 100€\nReviewed & Accepted ©");
+  const annotationText = textModal.getByLabel("Annotation text");
+  const typingSample = "responsive local text input ".repeat(12).trim();
+  const typingStarted = performance.now();
+  await annotationText.pressSequentially(typingSample);
+  performanceMetrics.annotationTypingMs = Math.round(
+    performance.now() - typingStarted,
+  );
+  expect(await annotationText.inputValue()).toBe(typingSample);
+  expect(performanceMetrics.annotationTypingMs).toBeLessThan(6000);
+  await annotationText.fill("Café Approval — 100€\nReviewed & Accepted ©");
   await textModal
     .getByRole("button", { name: "Add to document", exact: true })
     .click();
@@ -914,10 +941,30 @@ try {
   expect(errors).toEqual([]);
   await writeFile(
     join(output, "desktop-results.json"),
-    JSON.stringify({ steps, security, errors, savedPDF: saved }, null, 2),
+    JSON.stringify(
+      {
+        steps,
+        security,
+        performance: performanceMetrics,
+        errors,
+        savedPDF: saved,
+      },
+      null,
+      2,
+    ),
   );
   console.log(
-    JSON.stringify({ passed: steps.length, steps, security, errors }, null, 2),
+    JSON.stringify(
+      {
+        passed: steps.length,
+        steps,
+        security,
+        performance: performanceMetrics,
+        errors,
+      },
+      null,
+      2,
+    ),
   );
 } catch (error) {
   console.error(

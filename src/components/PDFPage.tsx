@@ -65,7 +65,16 @@ export const PDFPage = memo(function PDFPage({
   const [ready, setReady] = useState(false);
   const [draft, setDraft] = useState<number[][]>([]);
   const drawing = useRef<number[][] | null>(null);
+  const pendingDraft = useRef<number[][] | null>(null);
+  const draftFrame = useRef<number | null>(null);
   const [activeDrag, setActiveDrag] = useState<DragState | null>(null);
+
+  useEffect(
+    () => () => {
+      if (draftFrame.current !== null) cancelAnimationFrame(draftFrame.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!thumbnail || !container.current) return;
@@ -208,6 +217,11 @@ export const PDFPage = memo(function PDFPage({
     const points = drawing.current;
     if (!points) return;
     drawing.current = null;
+    pendingDraft.current = null;
+    if (draftFrame.current !== null) {
+      cancelAnimationFrame(draftFrame.current);
+      draftFrame.current = null;
+    }
     setDraft([]);
     const end = point(event);
     const start = points[0];
@@ -294,10 +308,7 @@ export const PDFPage = memo(function PDFPage({
   };
 
   // Drag & Resize Handlers
-  const handleStartMove = (
-    annot: AnnotationInfo,
-    e: React.PointerEvent,
-  ) => {
+  const handleStartMove = (annot: AnnotationInfo, e: React.PointerEvent) => {
     if (tool !== "select" || annot.locked || !annot.editable) return;
     e.stopPropagation();
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -596,16 +607,24 @@ export const PDFPage = memo(function PDFPage({
           }}
           onPointerMove={(event) => {
             if (!drawing.current) return;
-            const points =
-              tool === "Ink"
-                ? [...drawing.current, point(event)]
-                : [drawing.current[0], point(event)];
-            drawing.current = points;
-            setDraft(points);
+            const points = drawing.current;
+            if (tool === "Ink") points.push(point(event));
+            else drawing.current = [points[0], point(event)];
+            pendingDraft.current = drawing.current;
+            if (draftFrame.current !== null) return;
+            draftFrame.current = requestAnimationFrame(() => {
+              draftFrame.current = null;
+              if (pendingDraft.current) setDraft([...pendingDraft.current]);
+            });
           }}
           onPointerUp={finishDrawing}
           onPointerCancel={() => {
             drawing.current = null;
+            pendingDraft.current = null;
+            if (draftFrame.current !== null) {
+              cancelAnimationFrame(draftFrame.current);
+              draftFrame.current = null;
+            }
             setDraft([]);
           }}
         >

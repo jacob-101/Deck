@@ -252,6 +252,7 @@ export default function App() {
   const [textModalFont, setTextModalFont] = useState("Helv");
   const [textModalFill, setTextModalFill] = useState("none");
   const dialog = useRef<HTMLDialogElement>(null);
+  const textInput = useRef<HTMLTextAreaElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const searchInput = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -854,11 +855,12 @@ export default function App() {
     event.preventDefault();
     if (!modal) return;
     if (modal.kind === "text") {
-      if (!input.trim()) {
+      const contents = textInput.current?.value.trim() ?? "";
+      if (!contents) {
         setModalError("Add some text first.");
         return;
       }
-      if (input.length > 5000) {
+      if (contents.length > 5000) {
         setModalError("Keep annotation text to 5,000 characters or fewer.");
         return;
       }
@@ -873,7 +875,7 @@ export default function App() {
       let rect = modal.rect;
       if (isFreeText) {
         const fSize = Number(textModalFontSize) || 14;
-        const lines = input.trim().split("\n");
+        const lines = contents.split("\n");
         const lineCount = lines.length;
         const maxLineLen = Math.max(...lines.map((l) => l.length), 1);
         const charW = fSize * 0.58;
@@ -894,7 +896,7 @@ export default function App() {
         rect,
         color: annotColor,
         width: isFreeText ? 0 : stroke,
-        contents: input.trim(),
+        contents,
         fontSize: isFreeText ? Number(textModalFontSize) : undefined,
         font: isFreeText ? textModalFont : undefined,
         fillColor:
@@ -2097,11 +2099,11 @@ export default function App() {
                   : "This text will be placed onto the page. The original document stays unchanged."}
               </p>
               <textarea
+                ref={textInput}
                 aria-label="Annotation text"
                 autoFocus
                 rows={4}
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
+                defaultValue=""
                 placeholder={
                   modal.type === "Text"
                     ? "A thought worth keeping…"
