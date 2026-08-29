@@ -183,6 +183,10 @@ try {
     exact: true,
   });
   await expect(analysis).toBeVisible();
+  const analysisBounds = await analysis.boundingBox();
+  if (!analysisBounds) throw new Error("Document Analysis bounds unavailable");
+  expect(analysisBounds.width).toBeLessThanOrEqual(422);
+  expect(analysisBounds.height).toBeLessThanOrEqual(682);
   await expect(analysis).toContainText("Text-based PDF", { timeout: 30000 });
   await expect(analysis.locator("#markdown-preview")).toContainText(
     "A little less friction",

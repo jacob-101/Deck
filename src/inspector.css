@@ -4,6 +4,72 @@
   max-height: calc(100dvh - 56px);
   overflow-y: auto;
 }
+.analysis-dialog {
+  width: min(420px, calc(100vw - 48px));
+  max-height: min(680px, calc(100dvh - 96px));
+  padding: 21px;
+}
+.analysis-dialog .modal-heading {
+  margin-bottom: 13px;
+}
+.analysis-dialog > p {
+  margin: 8px 0 13px;
+  overflow-wrap: anywhere;
+}
+.analysis-dialog .analysis-summary {
+  margin: 12px 0;
+  padding: 12px 13px;
+}
+.analysis-dialog .analysis-summary strong {
+  font-size: 16px;
+}
+.analysis-dialog .document-metadata > div {
+  grid-template-columns: 86px 1fr;
+  padding: 8px 0;
+}
+.analysis-dialog .analysis-caveat {
+  margin: 11px 0 12px;
+  line-height: 1.55;
+}
+.analysis-dialog .ocr-workflow {
+  margin: 12px 0;
+}
+.analysis-dialog .ocr-workflow-intro {
+  gap: 12px;
+  padding: 12px 13px 10px;
+}
+.analysis-dialog .ocr-mark {
+  width: 46px;
+  height: 46px;
+  flex-basis: 46px;
+}
+.analysis-dialog .ocr-controls {
+  gap: 7px;
+  padding: 10px 13px 12px;
+}
+.analysis-dialog .ocr-controls label {
+  min-width: 138px;
+  flex: 1;
+}
+.analysis-dialog .ocr-controls .ocr-run {
+  flex: 1;
+  justify-content: center;
+  white-space: nowrap;
+}
+.analysis-dialog .markdown-heading {
+  margin-top: 14px;
+}
+.analysis-dialog .markdown-preview {
+  max-height: 180px;
+  margin-bottom: 10px;
+  padding: 11px;
+}
+.analysis-dialog .details-privacy {
+  margin-top: 13px;
+}
+.analysis-dialog .modal-actions {
+  margin-top: 16px;
+}
 .inspector-eyebrow {
   display: block;
   color: var(--green);
