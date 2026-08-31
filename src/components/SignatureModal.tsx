@@ -33,6 +33,16 @@ export function dataUrlToBytes(dataUrl: string): Uint8Array {
   }
   return bytes;
 }
+function bytesToDataUrl(bytes: Uint8Array) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(new Error("Could not encode signature."));
+    reader.readAsDataURL(
+      new Blob([Uint8Array.from(bytes).buffer], { type: "image/png" }),
+    );
+  });
+}
 
 export function SignatureModal({
   onSelect,
@@ -178,7 +188,10 @@ export function SignatureModal({
     if (!file) return;
     setError("");
     const validTypes = ["image/png", "image/jpeg", "image/jpg"];
-    if (!validTypes.includes(file.type.toLowerCase()) && !file.name.match(/\.(png|jpe?g)$/i)) {
+    if (
+      !validTypes.includes(file.type.toLowerCase()) &&
+      !file.name.match(/\.(png|jpe?g)$/i)
+    ) {
       setError("Please choose a PNG or JPEG image file.");
       return;
     }
@@ -294,6 +307,33 @@ export function SignatureModal({
           return;
         }
 
+        const sourceBytes = dataUrlToBytes(importedDataUrl);
+        if (window.desktop) {
+          const prepared = await window.desktop.prepareSignature(
+            sourceBytes,
+            removeBackground,
+          );
+          if (saveOptIn) {
+            try {
+              saveSignature({
+                name: "Imported Signature",
+                dataUrl: await bytesToDataUrl(prepared.bytes),
+                kind: "import",
+              });
+            } catch (storageErr) {
+              setError((storageErr as Error).message);
+            }
+          }
+          onSelect({
+            imageBytes: prepared.bytes,
+            name: "Imported Signature",
+            width: prepared.width,
+            height: prepared.height,
+          });
+          onClose();
+          return;
+        }
+
         const img = new Image();
         img.crossOrigin = "anonymous";
         await new Promise((resolve, reject) => {
@@ -309,7 +349,11 @@ export function SignatureModal({
 
         const imgWidth = img.naturalWidth || img.width;
         const imgHeight = img.naturalHeight || img.height;
-        if (imgWidth > 4096 || imgHeight > 4096 || imgWidth * imgHeight > 16_000_000) {
+        if (
+          imgWidth > 4096 ||
+          imgHeight > 4096 ||
+          imgWidth * imgHeight > 16_000_000
+        ) {
           throw new Error(
             "Image dimensions are too large (max 4096×4096 pixels). Please choose a smaller image.",
           );
@@ -370,7 +414,10 @@ export function SignatureModal({
     } catch (cause) {
       setError(
         cause instanceof Error
-          ? cause.message
+          ? cause.message.replace(
+              /^Error invoking remote method '[^']+': Error: /,
+              "",
+            )
           : "Could not create signature.",
       );
     } finally {
@@ -794,7 +841,9 @@ export function SignatureModal({
                   alignItems: "center",
                 }}
                 onClick={() => setSelectedFontIndex(idx)}
-                onKeyDown={(e) => e.key === "Enter" && setSelectedFontIndex(idx)}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && setSelectedFontIndex(idx)
+                }
               >
                 <span
                   style={{
@@ -1042,17 +1091,7 @@ function getTrimmedCanvas(source: HTMLCanvasElement): HTMLCanvasElement {
   const trimCtx = trimmedCanvas.getContext("2d");
   if (!trimCtx) return source;
 
-  trimCtx.drawImage(
-    source,
-    minX,
-    minY,
-    trimW,
-    trimH,
-    0,
-    0,
-    trimW,
-    trimH,
-  );
+  trimCtx.drawImage(source, minX, minY, trimW, trimH, 0, 0, trimW, trimH);
 
   return trimmedCanvas;
 }

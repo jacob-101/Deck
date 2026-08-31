@@ -137,6 +137,92 @@ function runLocalTool(executable: string, args: string[], timeoutMs = 120000) {
     });
   });
 }
+function rustNativePath() {
+  return app.isPackaged
+    ? join(process.resourcesPath, "native", "openpdf-native")
+    : join(app.getAppPath(), "build", "native", "openpdf-native");
+}
+function prepareSignatureNative(bytes: Uint8Array, removeWhite: boolean) {
+  return new Promise<{
+    bytes: Uint8Array;
+    width: number;
+    height: number;
+    engine: "Rust";
+  }>((resolvePromise, reject) => {
+    const child = spawn(
+      rustNativePath(),
+      ["signature", ...(removeWhite ? [] : ["--keep-background"])],
+      { stdio: ["pipe", "pipe", "pipe"], env: {} },
+    );
+    const chunks: Buffer[] = [];
+    let total = 0;
+    let stderr = "";
+    let stopped = false;
+    const finish = (cause?: Error) => {
+      if (stopped) return;
+      stopped = true;
+      clearTimeout(timeout);
+      if (cause) reject(cause);
+    };
+    const timeout = setTimeout(() => {
+      child.kill("SIGTERM");
+      finish(new Error("Native signature preparation timed out."));
+    }, 30000);
+    child.stdout.on("data", (chunk: Buffer) => {
+      total += chunk.length;
+      if (total > 25 * 1024 * 1024) {
+        child.kill("SIGTERM");
+        finish(new Error("Prepared signature exceeds the 25 MB limit."));
+      } else chunks.push(chunk);
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      if (stderr.length < 4000) stderr += chunk.toString();
+    });
+    child.on("error", (error) => finish(error));
+    child.on("close", (code) => {
+      if (stopped) return;
+      clearTimeout(timeout);
+      if (code !== 0) {
+        finish(
+          new Error(
+            stderr.replace(/^openpdf-native:\s*/, "").trim() ||
+              "Native signature preparation failed.",
+          ),
+        );
+        return;
+      }
+      const output = Buffer.concat(chunks);
+      const png =
+        output.length >= 24 &&
+        output[0] === 0x89 &&
+        output.subarray(1, 4).toString() === "PNG";
+      const width = png ? output.readUInt32BE(16) : 0;
+      const height = png ? output.readUInt32BE(20) : 0;
+      if (
+        !png ||
+        width < 5 ||
+        height < 5 ||
+        width > 4096 ||
+        height > 4096 ||
+        width * height > 16_000_000
+      ) {
+        finish(
+          new Error("Native signature preparation returned invalid data."),
+        );
+        return;
+      }
+      stopped = true;
+      resolvePromise({
+        bytes: new Uint8Array(output),
+        width,
+        height,
+        engine: "Rust",
+      });
+    });
+    child.stdin.on("error", () => {});
+    child.stdin.end(Buffer.from(bytes));
+  });
+}
 async function firstAvailable(paths: string[]) {
   for (const path of paths) {
     try {
@@ -250,6 +336,24 @@ function registerIPC() {
     }
     return images;
   });
+  ipcMain.handle(
+    "image:prepare-signature",
+    async (event, value: unknown, removeWhite: unknown) => {
+      trusted(event);
+      if (!(value instanceof Uint8Array) || value.length > 5 * 1024 * 1024)
+        throw new Error("Choose a signature image under 5 MB.");
+      const png = value.length >= 8 && value[0] === 0x89 && value[1] === 0x50;
+      const jpeg =
+        value.length >= 3 &&
+        value[0] === 0xff &&
+        value[1] === 0xd8 &&
+        value[2] === 0xff;
+      if (!png && !jpeg) throw new Error("Choose a valid PNG or JPEG image.");
+      if (typeof removeWhite !== "boolean")
+        throw new Error("Invalid signature preparation request.");
+      return prepareSignatureNative(value, removeWhite);
+    },
+  );
   ipcMain.handle("files:convert-word", async (event) => {
     trusted(event);
     const picked = await dialog.showOpenDialog(win, {

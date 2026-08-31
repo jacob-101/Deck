@@ -9,6 +9,7 @@ let worker: Worker | null = null;
 let ready = false;
 let queue: object[] = [];
 let sequence = 0;
+let editSessionRevisionId = "";
 const pending = new Map<
   number,
   {
@@ -22,6 +23,7 @@ function reset(message: string) {
   worker = null;
   ready = false;
   queue = [];
+  editSessionRevisionId = "";
   for (const request of pending.values()) {
     clearTimeout(request.timer);
     request.reject(new Error(message));
@@ -75,14 +77,27 @@ export const pdfEngine = {
     command: EditCommand,
     baseRevisionId: string,
     nextRevisionId = crypto.randomUUID(),
-  ) =>
-    call<PDFResult>({
-      action: "edit-session",
-      bytes,
-      command,
-      baseRevisionId,
-      nextRevisionId,
-    }).then((result) => ({ ...result, revisionId: nextRevisionId })),
+  ) => {
+    const execute = (includeBytes: boolean) =>
+      call<PDFResult>({
+        action: "edit-session",
+        ...(includeBytes ? { bytes } : {}),
+        command,
+        baseRevisionId,
+        nextRevisionId,
+      });
+    const includeBytes = editSessionRevisionId !== baseRevisionId;
+    return execute(includeBytes)
+      .catch((error) => {
+        if (includeBytes || error.message !== "PDF_EDIT_SESSION_MISS")
+          throw error;
+        return execute(true);
+      })
+      .then((result) => {
+        editSessionRevisionId = nextRevisionId;
+        return { ...result, revisionId: nextRevisionId };
+      });
+  },
   sample: () => call<PDFResult>({ action: "sample" }),
   extract: (bytes: Uint8Array, pages: number[]) =>
     call<Uint8Array>({ action: "extract", bytes, pages }),

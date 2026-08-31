@@ -6,7 +6,7 @@ A local PDF workspace for macOS. No accounts, no uploads, no telemetry.
 
 ## Run
 
-Requires Node.js 22.12+ and npm. On the first setup, dependency installation downloads Electron. PDF.js fonts, character maps, and MuPDF WebAssembly are bundled locally; opening and editing PDFs does not require a network connection.
+Requires Node.js 22.12+ and npm. Production packaging also requires Apple’s Xcode command-line tools and stable Rust/Cargo 1.84 or newer. On the first setup, dependency installation downloads Electron and Cargo resolves the pinned Rust image dependencies. PDF.js fonts, character maps, MuPDF WebAssembly, Apple Vision OCR, and the Rust image accelerator are bundled locally; opening and editing PDFs does not require a network connection.
 
 ```sh
 npm ci
@@ -49,6 +49,7 @@ The application is generated in `release/mac-arm64/OpenPDF Studio.app` on Apple 
 - Standard PDF highlights, underline, strike-through, ink, rectangles, ellipses, arrows, text boxes, sticky notes, and visible signature stamps. Select text while a markup tool is active; drag to draw; click to place a note or text box.
 - **Add Text (FreeText):** place text boxes anywhere on the page with customizable font sizes (10–32 pt), font families (Helvetica, Courier, Times), dedicated text colors, transparent or colored PDF background fills, multiline/Unicode characters, and interactive move/resize bounding boxes on the page canvas.
 - **Sign (Stamp):** draw a signature, type in elegant script styles, or import PNG/JPEG images (with automatic background transparency removal). Move and resize signatures with proportional aspect-ratio preservation. Save signatures locally with explicit opt-in.
+- **Rust acceleration:** imported signatures are decoded, cleaned, tightly cropped, and encoded in a narrow native Rust process instead of blocking the renderer. The canvas implementation remains available in the browser-only preview. Consecutive PDF edits also stop resending the complete source revision to the worker when its native document session is already current.
 - Annotation list, jump to annotated page, edit text/comments and color, adjust shape line weight, remove annotations. Locked annotations cannot be edited or deleted.
 - Embedded PDF table of contents, including nested sections and page destinations that follow page reordering. External destinations are not opened.
 - Document details: title, author, subject, creator, producer, PDF version, page dimensions, file size, and annotation count.

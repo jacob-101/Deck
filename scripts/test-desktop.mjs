@@ -53,6 +53,25 @@ function createScannedPDF() {
 const output = resolve("test-results");
 await mkdir(output, { recursive: true });
 const temp = await mkdtemp(join(tmpdir(), "openpdf-desktop-"));
+const importedSignature = join(temp, "imported-signature.png");
+const signaturePixmap = new mupdf.Pixmap(
+  mupdf.ColorSpace.DeviceRGB,
+  [0, 0, 1600, 700],
+  true,
+);
+signaturePixmap.clear(255);
+const signaturePixels = signaturePixmap.getPixels();
+for (let y = 300; y < 390; y++) {
+  for (let x = 260; x < 1340; x++) {
+    const index = y * signaturePixmap.getStride() + x * 4;
+    signaturePixels[index] = 24;
+    signaturePixels[index + 1] = 35;
+    signaturePixels[index + 2] = 29;
+    signaturePixels[index + 3] = 255;
+  }
+}
+await writeFile(importedSignature, signaturePixmap.asPNG());
+signaturePixmap.destroy();
 const app = await electron.launch({
   ...(process.env.OPENPDF_TEST_EXECUTABLE
     ? { executablePath: process.env.OPENPDF_TEST_EXECUTABLE }
@@ -709,8 +728,47 @@ try {
     signatureModal.getByRole("button", { name: "Draw" }),
   ).toHaveClass(/active/);
   await signatureModal.getByRole("button", { name: "Cancel" }).click();
+  const nativeSignature = await page.evaluate(
+    async (values) => {
+      const result = await window.desktop.prepareSignature(
+        new Uint8Array(values),
+        true,
+      );
+      return {
+        engine: result.engine,
+        width: result.width,
+        height: result.height,
+        signature: Array.from(result.bytes.slice(0, 4)),
+      };
+    },
+    Array.from(await readFile(importedSignature)),
+  );
+  expect(nativeSignature.engine).toBe("Rust");
+  expect(nativeSignature.width).toBeLessThan(1600);
+  expect(nativeSignature.height).toBeLessThan(700);
+  expect(nativeSignature.signature).toEqual([0x89, 0x50, 0x4e, 0x47]);
+  await page.getByRole("button", { name: "Sign", exact: true }).click();
+  await signatureModal
+    .getByRole("button", { name: "Import", exact: true })
+    .click();
+  await signatureModal
+    .locator('input[type="file"]')
+    .setInputFiles(importedSignature);
+  await expect(
+    signatureModal.getByAltText("Imported Signature Preview"),
+  ).toBeVisible();
+  const importStarted = performance.now();
+  await signatureModal
+    .getByRole("button", { name: "Place Signature", exact: true })
+    .click();
+  await noBusy();
+  await ready();
+  performanceMetrics.rustSignatureImportMs = Math.round(
+    performance.now() - importStarted,
+  );
+  await expect(page.locator(".note-card")).toHaveCount(6);
   steps.push(
-    "Sign workflow with typed signature, persistence opt-in, placement, and saved signature deletion",
+    "Sign workflow with typed signature plus Rust-accelerated imported-image cleanup and placement",
   );
 
   await page.getByRole("button", { name: "Organize", exact: true }).click();
@@ -856,7 +914,7 @@ try {
   await noBusy();
   await ready();
   await page.getByRole("button", { name: "Annotations", exact: true }).click();
-  await expect(page.locator(".note-card")).toHaveCount(5);
+  await expect(page.locator(".note-card")).toHaveCount(6);
   steps.push("Reopen saved PDF from recent files with annotations intact");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await settings.getByRole("button", { name: "Privacy", exact: true }).click();

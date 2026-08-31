@@ -9,4 +9,5 @@ release/
 .DS_Store
 test-results/
 build/native/
+native-rust/target/
 *.log

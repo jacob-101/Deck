@@ -39,6 +39,7 @@ The desktop harness supplies native dialog choices but calls the real preload, I
 - Markdown-to-PDF is exercised through the packaged native file service and reopened as a selectable PDF. LaTeX uses a restricted local MacTeX engine when present, with a bounded built-in offline fallback for common document commands.
 - Benchmark gap coverage includes structural compression, PNG/JPEG page rendering through 600 DPI, AES-256 encryption, annotation/form flattening, crop and A4/Letter resize, and local privacy inspection/cleanup. Native export validates file signatures before writing.
 - The `openpdf` CLI exposes 23 offline commands through a machine-readable capability schema. Integration coverage invokes the built CLI as a separate Node process for inspection, text/Markdown extraction, atomic overwrite protection, encryption/unlocking, privacy scanning, and deterministic page rendering. Direct Apple Vision CLI OCR was also verified on a generated one-page PDF and produced Markdown with the recognized text.
+- The Rust accelerator has two native unit tests for background removal, tight cropping, padding, and blank-image rejection. Packaged Electron QA calls the narrow preload API, confirms the `Rust` engine and PNG signature, then imports and places the result through the real signing workflow. A 4000×4000 benchmark measured a 32.8 ms warm Rust median for decode, cleanup, crop, and PNG encode versus 45.6 ms for the former JavaScript pixel passes alone. The final packaged UI path completed in 32 ms.
 
 ## Version 0.3 reader, text, and signing checks
 
@@ -53,7 +54,7 @@ The desktop harness supplies native dialog choices but calls the real preload, I
 
 ## Packaging
 
-`release/mac-arm64/OpenPDF Studio.app`, Electron 44.0.0, macOS arm64. Version 0.4.0. Local unsigned distribution. Unit and integration suite: `54 passed`. Packaged real-Electron suite: `33 passed, 0 renderer errors`. The packaged suite verifies high-quality PNG page export and the local privacy scan/clean flow. No public binary release performed.
+`release/mac-arm64/OpenPDF Studio.app`, Electron 44.0.0, macOS arm64. Version 0.4.0. Local unsigned distribution. Unit and integration suite: `56 passed` (54 TypeScript/CLI plus 2 Rust). Packaged real-Electron suite: `33 passed, 0 renderer errors`. The packaged suite verifies the Rust image accelerator, high-quality PNG page export, and the local privacy scan/clean flow. No public binary release performed.
 
 ## Not verified
 

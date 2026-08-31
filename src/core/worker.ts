@@ -69,6 +69,8 @@ self.onmessage = ({ data }) => {
       result = { bytes: output, info: inspect(output) };
     } else if (action === "edit-session") {
       if (!sessionDocument || sessionRevisionId !== baseRevisionId) {
+        if (!(bytes instanceof Uint8Array))
+          throw new Error("PDF_EDIT_SESSION_MISS");
         sessionDocument?.destroy();
         sessionDocument = openPDF(bytes);
         sessionRevisionId = baseRevisionId;

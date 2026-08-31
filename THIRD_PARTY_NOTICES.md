@@ -12,6 +12,7 @@ OpenPDF Studio is licensed under AGPL-3.0-only. See LICENSE. The unmodified upst
 | Lucide icons                 | ISC                                                                | https://github.com/lucide-icons/lucide      |
 | Tailwind CSS                 | MIT                                                                | https://github.com/tailwindlabs/tailwindcss |
 | PDF Inspector WebAssembly    | MIT                                                                | https://github.com/firecrawl/pdf-inspector  |
+| Rust `image` crate           | MIT OR Apache-2.0                                                  | https://github.com/image-rs/image           |
 
 The text-layer positioning rules in src/styles.css are adapted from Mozilla PDF.js, copyright Mozilla Foundation and contributors, Apache-2.0. The PDF rendering assets include their upstream license files. MuPDF's fonts and other components retain the notices shipped in its upstream source. Full dependency versions are pinned in package-lock.json. Electron's bundled LICENSE and LICENSES.chromium.html are retained by the packager.
 

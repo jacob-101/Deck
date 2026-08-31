@@ -5,6 +5,8 @@ const api: DesktopAPI = {
   open: () => ipcRenderer.invoke("files:open"),
   openRecent: (id) => ipcRenderer.invoke("files:recent", id),
   openImages: () => ipcRenderer.invoke("files:open-images"),
+  prepareSignature: (bytes, removeWhite) =>
+    ipcRenderer.invoke("image:prepare-signature", bytes, removeWhite),
   convertWord: () => ipcRenderer.invoke("files:convert-word"),
   pickPDF: () => ipcRenderer.invoke("files:pick-pdf"),
   convertPDFToDocx: (pages, name, mode) =>

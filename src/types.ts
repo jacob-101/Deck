@@ -32,6 +32,15 @@ export type DesktopAPI = {
   open(): Promise<OpenFile | null>;
   openRecent(id: string): Promise<OpenFile>;
   openImages(): Promise<ImageFile[] | null>;
+  prepareSignature(
+    bytes: Uint8Array,
+    removeWhite: boolean,
+  ): Promise<{
+    bytes: Uint8Array;
+    width: number;
+    height: number;
+    engine: "Rust";
+  }>;
   convertWord(): Promise<(OpenFile & { engine: string }) | null>;
   pickPDF(): Promise<OpenFile | null>;
   convertPDFToDocx(
