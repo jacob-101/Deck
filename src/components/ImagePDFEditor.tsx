@@ -50,11 +50,15 @@ export function ImagePDFEditor({
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState("");
   const cropSurface = useRef<HTMLDivElement>(null);
+  const cropFrame = useRef<number | null>(null);
+  const pendingCrop = useRef<{ id: string; crop: ImageCrop } | null>(null);
   const itemsRef = useRef(items);
   itemsRef.current = items;
   useEffect(
-    () => () =>
-      itemsRef.current.forEach((item) => URL.revokeObjectURL(item.url)),
+    () => () => {
+      if (cropFrame.current !== null) cancelAnimationFrame(cropFrame.current);
+      itemsRef.current.forEach((item) => URL.revokeObjectURL(item.url));
+    },
     [],
   );
   const selected = items.find((item) => item.id === selectedId) ?? items[0];
@@ -97,7 +101,12 @@ export function ImagePDFEditor({
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
     const bounds = cropSurface.current.getBoundingClientRect();
-    const start = { x: event.clientX, y: event.clientY, crop: selected.crop };
+    const start = {
+      id: selected.id,
+      x: event.clientX,
+      y: event.clientY,
+      crop: selected.crop,
+    };
     const onMove = (moveEvent: PointerEvent) => {
       const dx = (moveEvent.clientX - start.x) / bounds.width;
       const dy = (moveEvent.clientY - start.y) / bounds.height;
@@ -122,9 +131,23 @@ export function ImagePDFEditor({
         if (handle.includes("s"))
           height = Math.max(min, Math.min(1 - y, height + dy));
       }
-      update(selected.id, { crop: { x, y, width, height } });
+      pendingCrop.current = { id: start.id, crop: { x, y, width, height } };
+      if (cropFrame.current === null) {
+        cropFrame.current = requestAnimationFrame(() => {
+          cropFrame.current = null;
+          const pending = pendingCrop.current;
+          if (pending) update(pending.id, { crop: pending.crop });
+        });
+      }
     };
     const stop = () => {
+      if (cropFrame.current !== null) {
+        cancelAnimationFrame(cropFrame.current);
+        cropFrame.current = null;
+      }
+      const pending = pendingCrop.current;
+      if (pending) update(pending.id, { crop: pending.crop });
+      pendingCrop.current = null;
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", stop);
     };

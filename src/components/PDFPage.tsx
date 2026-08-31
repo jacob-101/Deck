@@ -70,6 +70,7 @@ export const PDFPage = memo(function PDFPage({
   const [activeDrag, setActiveDrag] = useState<DragState | null>(null);
   const activeDragRef = useRef<DragState | null>(null);
   const dragFrame = useRef<number | null>(null);
+  const interactionBounds = useRef<DOMRect | null>(null);
 
   useEffect(
     () => () => {
@@ -187,7 +188,8 @@ export const PDFPage = memo(function PDFPage({
   }, [search, ready, thumbnail]);
 
   const point = (event: React.PointerEvent) => {
-    const rect = container.current!.getBoundingClientRect();
+    const rect =
+      interactionBounds.current ?? container.current!.getBoundingClientRect();
     return [
       Math.max(
         0,
@@ -249,6 +251,7 @@ export const PDFPage = memo(function PDFPage({
     const points = drawing.current;
     if (!points) return;
     drawing.current = null;
+    interactionBounds.current = null;
     pendingDraft.current = null;
     if (draftFrame.current !== null) {
       cancelAnimationFrame(draftFrame.current);
@@ -343,6 +346,7 @@ export const PDFPage = memo(function PDFPage({
   const handleStartMove = (annot: AnnotationInfo, e: React.PointerEvent) => {
     if (tool !== "select" || annot.locked || !annot.editable) return;
     e.stopPropagation();
+    interactionBounds.current = container.current?.getBoundingClientRect() ?? null;
     container.current
       ?.querySelector<HTMLElement>(".annotation-interaction-layer")
       ?.setPointerCapture(e.pointerId);
@@ -379,6 +383,7 @@ export const PDFPage = memo(function PDFPage({
     e: React.PointerEvent,
   ) => {
     e.stopPropagation();
+    interactionBounds.current = container.current?.getBoundingClientRect() ?? null;
     container.current
       ?.querySelector<HTMLElement>(".annotation-interaction-layer")
       ?.setPointerCapture(e.pointerId);
@@ -488,6 +493,7 @@ export const PDFPage = memo(function PDFPage({
     }
     const { id, originalRect, currentRect } = drag;
     activeDragRef.current = null;
+    interactionBounds.current = null;
 
     const changed =
       Math.abs(currentRect[0] - originalRect[0]) > 0.5 ||
@@ -669,6 +675,7 @@ export const PDFPage = memo(function PDFPage({
           onPointerDown={(event) => {
             if (event.button !== 0) return;
             event.currentTarget.setPointerCapture(event.pointerId);
+            interactionBounds.current = container.current?.getBoundingClientRect() ?? null;
             const p = point(event);
             drawing.current = [p];
             setDraft([p]);
@@ -695,6 +702,7 @@ export const PDFPage = memo(function PDFPage({
           onPointerUp={finishDrawing}
           onPointerCancel={() => {
             drawing.current = null;
+            interactionBounds.current = null;
             pendingDraft.current = null;
             if (draftFrame.current !== null) {
               cancelAnimationFrame(draftFrame.current);

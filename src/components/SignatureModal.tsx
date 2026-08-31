@@ -60,6 +60,7 @@ export function SignatureModal({
 
   // Draw state
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawBoundsRef = useRef<DOMRect | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [strokeHistory, setStrokeHistory] = useState<ImageData[]>([]);
   const [hasDrawn, setHasDrawn] = useState(false);
@@ -108,6 +109,8 @@ export function SignatureModal({
     ]);
 
     const rect = canvas.getBoundingClientRect();
+    drawBoundsRef.current = rect;
+    if ("pointerId" in event) canvas.setPointerCapture(event.pointerId);
     const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
     const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
 
@@ -130,7 +133,7 @@ export function SignatureModal({
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    const rect = canvas.getBoundingClientRect();
+    const rect = drawBoundsRef.current ?? canvas.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * canvas.width;
     const y = ((event.clientY - rect.top) / rect.height) * canvas.height;
 
@@ -140,6 +143,7 @@ export function SignatureModal({
 
   const endDraw = () => {
     setIsDrawing(false);
+    drawBoundsRef.current = null;
   };
 
   const clearCanvas = () => {
