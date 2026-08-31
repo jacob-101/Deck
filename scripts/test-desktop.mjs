@@ -674,9 +674,10 @@ try {
   await ready();
 
   // Move Text Box via page interaction
-  const freeTextHandle = page.locator(
-    '.annotation-interaction-layer div[role="button"][aria-label*="FreeText"]',
-  );
+  const freeTextHandle = page.getByRole("button", {
+    name: "FreeText annotation 4",
+    exact: true,
+  });
   await expect(freeTextHandle).toBeVisible();
   const ftBox = await freeTextHandle.boundingBox();
   await page.mouse.move(ftBox.x + ftBox.width / 2, ftBox.y + ftBox.height / 2);
@@ -688,6 +689,28 @@ try {
   );
   await page.mouse.up();
   await noBusy();
+  await ready();
+  const resizedTextHandle = page.getByLabel(
+    "SE resize handle for FreeText annotation 4",
+  );
+  const resizedTextBoxBefore = await freeTextHandle.boundingBox();
+  const resizedTextHandleBox = await resizedTextHandle.boundingBox();
+  await page.mouse.move(
+    resizedTextHandleBox.x + resizedTextHandleBox.width / 2,
+    resizedTextHandleBox.y + resizedTextHandleBox.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    resizedTextHandleBox.x + resizedTextHandleBox.width / 2 + 48,
+    resizedTextHandleBox.y + resizedTextHandleBox.height / 2 + 24,
+    { steps: 12 },
+  );
+  await page.mouse.up();
+  await noBusy();
+  await ready();
+  const resizedTextBoxAfter = await freeTextHandle.boundingBox();
+  expect(resizedTextBoxAfter.width).toBeGreaterThan(resizedTextBoxBefore.width);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
   await ready();
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await ready();

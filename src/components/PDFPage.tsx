@@ -68,10 +68,13 @@ export const PDFPage = memo(function PDFPage({
   const pendingDraft = useRef<number[][] | null>(null);
   const draftFrame = useRef<number | null>(null);
   const [activeDrag, setActiveDrag] = useState<DragState | null>(null);
+  const activeDragRef = useRef<DragState | null>(null);
+  const dragFrame = useRef<number | null>(null);
 
   useEffect(
     () => () => {
       if (draftFrame.current !== null) cancelAnimationFrame(draftFrame.current);
+      if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
     },
     [],
   );
@@ -311,7 +314,9 @@ export const PDFPage = memo(function PDFPage({
   const handleStartMove = (annot: AnnotationInfo, e: React.PointerEvent) => {
     if (tool !== "select" || annot.locked || !annot.editable) return;
     e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
+    container.current
+      ?.querySelector<HTMLElement>(".annotation-interaction-layer")
+      ?.setPointerCapture(e.pointerId);
     onSelectAnnotation?.(annot.id);
     const p = point(e);
     const rect = annot.rect || [0, 0, 0, 0];
@@ -326,7 +331,7 @@ export const PDFPage = memo(function PDFPage({
     const h = originalRect[3] - originalRect[1];
     const aspectRatio = h > 0 ? w / h : 1;
 
-    setActiveDrag({
+    const drag: DragState = {
       type: "move",
       id: annot.id,
       startPoint: [p[0], p[1]],
@@ -334,7 +339,9 @@ export const PDFPage = memo(function PDFPage({
       currentRect: [...originalRect],
       aspectRatio,
       isStamp,
-    });
+    };
+    activeDragRef.current = drag;
+    setActiveDrag(drag);
   };
 
   const handleStartResize = (
@@ -343,7 +350,9 @@ export const PDFPage = memo(function PDFPage({
     e: React.PointerEvent,
   ) => {
     e.stopPropagation();
-    e.currentTarget.setPointerCapture(e.pointerId);
+    container.current
+      ?.querySelector<HTMLElement>(".annotation-interaction-layer")
+      ?.setPointerCapture(e.pointerId);
     const p = point(e);
     const rect = annot.rect || [0, 0, 0, 0];
     const originalRect: [number, number, number, number] = [
@@ -357,7 +366,7 @@ export const PDFPage = memo(function PDFPage({
     const h = originalRect[3] - originalRect[1];
     const aspectRatio = h > 0 ? w / h : 1;
 
-    setActiveDrag({
+    const drag: DragState = {
       type: handleType,
       id: annot.id,
       startPoint: [p[0], p[1]],
@@ -365,15 +374,18 @@ export const PDFPage = memo(function PDFPage({
       currentRect: [...originalRect],
       aspectRatio,
       isStamp,
-    });
+    };
+    activeDragRef.current = drag;
+    setActiveDrag(drag);
   };
 
   const handleDragMove = (e: React.PointerEvent) => {
-    if (!activeDrag) return;
+    const drag = activeDragRef.current;
+    if (!drag) return;
     const p = point(e);
-    const dx = p[0] - activeDrag.startPoint[0];
-    const dy = p[1] - activeDrag.startPoint[1];
-    const [ox0, oy0, ox1, oy1] = activeDrag.originalRect;
+    const dx = p[0] - drag.startPoint[0];
+    const dy = p[1] - drag.startPoint[1];
+    const [ox0, oy0, ox1, oy1] = drag.originalRect;
     const pageWidth = size.width / scale;
     const pageHeight = size.height / scale;
 
@@ -382,7 +394,7 @@ export const PDFPage = memo(function PDFPage({
     let nx1 = ox1;
     let ny1 = oy1;
 
-    if (activeDrag.type === "move") {
+    if (drag.type === "move") {
       const w = ox1 - ox0;
       const h = oy1 - oy0;
       nx0 = Math.max(0, Math.min(pageWidth - w, ox0 + dx));
@@ -390,49 +402,63 @@ export const PDFPage = memo(function PDFPage({
       nx1 = nx0 + w;
       ny1 = ny0 + h;
     } else {
-      if (activeDrag.type === "se") {
+      if (drag.type === "se") {
         nx1 = Math.min(pageWidth, Math.max(ox0 + 20, ox1 + dx));
-        if (activeDrag.isStamp && activeDrag.aspectRatio) {
+        if (drag.isStamp && drag.aspectRatio) {
           const newW = nx1 - ox0;
-          ny1 = Math.min(pageHeight, ox0 + newW / activeDrag.aspectRatio);
+          ny1 = Math.min(pageHeight, oy0 + newW / drag.aspectRatio);
         } else {
           ny1 = Math.min(pageHeight, Math.max(oy0 + 15, oy1 + dy));
         }
-      } else if (activeDrag.type === "sw") {
+      } else if (drag.type === "sw") {
         nx0 = Math.max(0, Math.min(ox1 - 20, ox0 + dx));
-        if (activeDrag.isStamp && activeDrag.aspectRatio) {
+        if (drag.isStamp && drag.aspectRatio) {
           const newW = ox1 - nx0;
-          ny1 = Math.min(pageHeight, oy0 + newW / activeDrag.aspectRatio);
+          ny1 = Math.min(pageHeight, oy0 + newW / drag.aspectRatio);
         } else {
           ny1 = Math.min(pageHeight, Math.max(oy0 + 15, oy1 + dy));
         }
-      } else if (activeDrag.type === "ne") {
+      } else if (drag.type === "ne") {
         nx1 = Math.min(pageWidth, Math.max(ox0 + 20, ox1 + dx));
-        if (activeDrag.isStamp && activeDrag.aspectRatio) {
+        if (drag.isStamp && drag.aspectRatio) {
           const newW = nx1 - ox0;
-          ny0 = Math.max(0, oy1 - newW / activeDrag.aspectRatio);
+          ny0 = Math.max(0, oy1 - newW / drag.aspectRatio);
         } else {
           ny0 = Math.max(0, Math.min(oy1 - 15, oy0 + dy));
         }
-      } else if (activeDrag.type === "nw") {
+      } else if (drag.type === "nw") {
         nx0 = Math.max(0, Math.min(ox1 - 20, ox0 + dx));
-        if (activeDrag.isStamp && activeDrag.aspectRatio) {
+        if (drag.isStamp && drag.aspectRatio) {
           const newW = ox1 - nx0;
-          ny0 = Math.max(0, oy1 - newW / activeDrag.aspectRatio);
+          ny0 = Math.max(0, oy1 - newW / drag.aspectRatio);
         } else {
           ny0 = Math.max(0, Math.min(oy1 - 15, oy0 + dy));
         }
       }
     }
 
-    setActiveDrag((prev) =>
-      prev ? { ...prev, currentRect: [nx0, ny0, nx1, ny1] } : null,
-    );
+    const next: DragState = {
+      ...drag,
+      currentRect: [nx0, ny0, nx1, ny1],
+    };
+    activeDragRef.current = next;
+    if (dragFrame.current !== null) return;
+    dragFrame.current = requestAnimationFrame(() => {
+      dragFrame.current = null;
+      const latest = activeDragRef.current;
+      if (latest) setActiveDrag({ ...latest });
+    });
   };
 
   const handleDragEnd = () => {
-    if (!activeDrag) return;
-    const { id, originalRect, currentRect } = activeDrag;
+    const drag = activeDragRef.current;
+    if (!drag) return;
+    if (dragFrame.current !== null) {
+      cancelAnimationFrame(dragFrame.current);
+      dragFrame.current = null;
+    }
+    const { id, originalRect, currentRect } = drag;
+    activeDragRef.current = null;
     setActiveDrag(null);
 
     const changed =
@@ -493,7 +519,14 @@ export const PDFPage = memo(function PDFPage({
           }}
           onPointerMove={handleDragMove}
           onPointerUp={handleDragEnd}
-          onPointerCancel={() => setActiveDrag(null)}
+          onPointerCancel={() => {
+            activeDragRef.current = null;
+            if (dragFrame.current !== null) {
+              cancelAnimationFrame(dragFrame.current);
+              dragFrame.current = null;
+            }
+            setActiveDrag(null);
+          }}
         >
           {annotations
             .filter(
@@ -578,6 +611,8 @@ export const PDFPage = memo(function PDFPage({
                         return (
                           <div
                             key={handle}
+                            role="button"
+                            aria-label={`${handle.toUpperCase()} resize handle for ${ann.type} annotation ${ann.id + 1}`}
                             style={style}
                             onPointerDown={(e) =>
                               handleStartResize(handle, ann, e)
