@@ -6,10 +6,12 @@ import {
   createSample,
   imagesToPDF,
   inspectDocument,
+  inspectPage,
   openPDF,
   serializePDF,
 } from "./pdf";
 import type * as mupdf from "mupdf";
+import type { DocumentInfo } from "../types";
 import {
   addBatesNumbers,
   alternateMix,
@@ -33,8 +35,12 @@ import {
 
 let sessionDocument: mupdf.PDFDocument | null = null;
 let sessionRevisionId = "";
+let sessionInfo: DocumentInfo | null = null;
 
-self.addEventListener("close", () => sessionDocument?.destroy());
+self.addEventListener("close", () => {
+  sessionDocument?.destroy();
+  sessionInfo = null;
+});
 self.onmessage = ({ data }) => {
   const {
     id,
@@ -74,11 +80,27 @@ self.onmessage = ({ data }) => {
         sessionDocument?.destroy();
         sessionDocument = openPDF(bytes);
         sessionRevisionId = baseRevisionId;
+        sessionInfo = inspectDocument(sessionDocument);
       }
       editDocument(sessionDocument, command);
       const output = serializePDF(sessionDocument);
       sessionRevisionId = nextRevisionId;
-      result = { bytes: output, info: inspectDocument(sessionDocument) };
+      if (
+        sessionInfo &&
+        (command.type === "annotate" ||
+          command.type === "update-annotation" ||
+          command.type === "remove-annotation")
+      ) {
+        sessionInfo = {
+          ...sessionInfo,
+          pages: sessionInfo.pages.map((page, index) =>
+            index === command.page ? inspectPage(sessionDocument!, index) : page,
+          ),
+        };
+      } else {
+        sessionInfo = inspectDocument(sessionDocument);
+      }
+      result = { bytes: output, info: sessionInfo };
     } else if (action === "extract") result = extract(bytes, pages);
     else if (action === "images") {
       const output = imagesToPDF(images);
@@ -116,6 +138,7 @@ self.onmessage = ({ data }) => {
       sessionDocument?.destroy();
       sessionDocument = null;
       sessionRevisionId = "";
+      sessionInfo = null;
     }
     self.postMessage({
       id,

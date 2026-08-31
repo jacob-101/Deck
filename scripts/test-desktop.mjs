@@ -619,7 +619,11 @@ try {
   box = await page.locator(".page-stage .pdf-page").boundingBox();
   await page.mouse.click(box.x + 200, box.y + 160);
   const textModal = page.getByRole("dialog");
+  const textModalOpened = performance.now();
   await expect(textModal).toBeVisible();
+  performanceMetrics.addTextModalOpenMs = Math.round(
+    performance.now() - textModalOpened,
+  );
   await textModal.getByLabel("Font size").selectOption("18");
   await textModal.getByLabel("Font family").selectOption("Cour");
   await textModal.getByRole("button", { name: "Charcoal" }).click();
@@ -634,11 +638,16 @@ try {
   expect(await annotationText.inputValue()).toBe(typingSample);
   expect(performanceMetrics.annotationTypingMs).toBeLessThan(6000);
   await annotationText.fill("Café Approval — 100€\nReviewed & Accepted ©");
+  const addTextCommitStarted = performance.now();
   await textModal
     .getByRole("button", { name: "Add to document", exact: true })
     .click();
   await noBusy();
   await ready();
+  performanceMetrics.addTextCommitMs = Math.round(
+    performance.now() - addTextCommitStarted,
+  );
+  expect(performanceMetrics.addTextCommitMs).toBeLessThan(10000);
   await expect(page.locator(".note-card")).toHaveCount(4);
   await expect(page.locator(".note-card").last()).toContainText(
     "Café Approval — 100€",

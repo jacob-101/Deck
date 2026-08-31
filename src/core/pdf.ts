@@ -119,6 +119,48 @@ function readOutline(
     };
   }
 }
+export function inspectPage(doc: mupdf.PDFDocument, index: number) {
+  const page = doc.loadPage(index);
+  const object = page.getObject();
+  const rotate = object.getInheritable("Rotate");
+  const annots = page.getAnnotations();
+  try {
+    const bounds = page.getBounds();
+    return {
+      width: bounds[2] - bounds[0],
+      height: bounds[3] - bounds[1],
+      rotation: rotate.asNumber() || 0,
+      annotations: annots.map((annotation, id) => {
+        const isFreeText = annotation.getType() === "FreeText";
+        const appearance = isFreeText
+          ? annotation.getDefaultAppearance()
+          : null;
+        const background = isFreeText ? annotation.getColor() : [];
+        const rect = annotation.hasRect() ? annotation.getRect() : [0, 0, 0, 0];
+        return {
+          id,
+          type: annotation.getType(),
+          contents: annotation.getContents(),
+          color: isFreeText ? appearance!.color : annotation.getColor(),
+          fontSize: isFreeText ? appearance!.size : null,
+          font: isFreeText ? appearance!.font : null,
+          fillColor: isFreeText && background.length ? background : null,
+          rect: [rect[0], rect[1], rect[2], rect[3]],
+          width: annotation.hasBorder() ? annotation.getBorderWidth() : null,
+          editable:
+            editableTypes.has(annotation.getType()) &&
+            !annotationLocked(annotation),
+          locked: annotationLocked(annotation),
+        };
+      }),
+    };
+  } finally {
+    for (const annotation of annots) annotation.destroy();
+    rotate.destroy();
+    object.destroy();
+    page.destroy();
+  }
+}
 export function inspectDocument(doc: mupdf.PDFDocument): DocumentInfo {
   return {
     title: doc.getMetaData("info:Title") ?? "",
@@ -128,52 +170,9 @@ export function inspectDocument(doc: mupdf.PDFDocument): DocumentInfo {
     producer: doc.getMetaData("info:Producer") ?? "",
     format: doc.getMetaData("format") ?? "PDF",
     ...readOutline(doc),
-    pages: Array.from({ length: doc.countPages() }, (_, index) => {
-      const page = doc.loadPage(index);
-      const object = page.getObject();
-      const rotate = object.getInheritable("Rotate");
-      const annots = page.getAnnotations();
-      try {
-        const bounds = page.getBounds();
-        return {
-          width: bounds[2] - bounds[0],
-          height: bounds[3] - bounds[1],
-          rotation: rotate.asNumber() || 0,
-          annotations: annots.map((annotation, id) => {
-            const isFreeText = annotation.getType() === "FreeText";
-            const appearance = isFreeText
-              ? annotation.getDefaultAppearance()
-              : null;
-            const background = isFreeText ? annotation.getColor() : [];
-            const rect = annotation.hasRect()
-              ? annotation.getRect()
-              : [0, 0, 0, 0];
-            return {
-              id,
-              type: annotation.getType(),
-              contents: annotation.getContents(),
-              color: isFreeText ? appearance!.color : annotation.getColor(),
-              fontSize: isFreeText ? appearance!.size : null,
-              font: isFreeText ? appearance!.font : null,
-              fillColor: isFreeText && background.length ? background : null,
-              rect: [rect[0], rect[1], rect[2], rect[3]],
-              width: annotation.hasBorder()
-                ? annotation.getBorderWidth()
-                : null,
-              editable:
-                editableTypes.has(annotation.getType()) &&
-                !annotationLocked(annotation),
-              locked: annotationLocked(annotation),
-            };
-          }),
-        };
-      } finally {
-        for (const annotation of annots) annotation.destroy();
-        rotate.destroy();
-        object.destroy();
-        page.destroy();
-      }
-    }),
+    pages: Array.from({ length: doc.countPages() }, (_, index) =>
+      inspectPage(doc, index),
+    ),
   };
 }
 export function inspect(bytes: Uint8Array): DocumentInfo {
