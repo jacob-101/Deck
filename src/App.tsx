@@ -630,11 +630,14 @@ export default function App() {
     order.splice(to, 0, order.splice(from, 1)[0]);
     applyEdit({ type: "reorder", order }, "Reorder pages", to);
   };
-  const addAnnotation = (annotation: AnnotationInput) =>
-    applyEdit(
-      { type: "annotate", page, annotation },
-      `Add ${annotation.type === "Text" ? "note" : annotation.type.toLowerCase()}`,
-    );
+  const addAnnotation = useCallback(
+    (annotation: AnnotationInput) =>
+      applyEdit(
+        { type: "annotate", page, annotation },
+        `Add ${annotation.type === "Text" ? "note" : annotation.type.toLowerCase()}`,
+      ),
+    [page, applyEdit],
+  );
   const handleSignatureSelect = (sig: SignatureResult) => {
     if (!revision) return;
     const pInfo = revision.info.pages[page];
@@ -666,18 +669,51 @@ export default function App() {
     setTab("notes");
     notify("Signature placed on page. Drag to reposition or resize.");
   };
-  const handleUpdateAnnotationRect = (id: number, newRect: number[]) => {
-    if (!revision) return;
-    applyEdit(
-      {
-        type: "update-annotation",
-        page,
-        id,
-        patch: { rect: newRect },
-      },
-      "Move annotation",
-    );
-  };
+  const handleUpdateAnnotationRect = useCallback(
+    (id: number, newRect: number[]) => {
+      if (!revision) return;
+      applyEdit(
+        {
+          type: "update-annotation",
+          page,
+          id,
+          patch: { rect: newRect },
+        },
+        "Move annotation",
+      );
+    },
+    [revision, page, applyEdit],
+  );
+  // Stable callbacks for PDFPage — keeps memo() effective when unrelated
+  // App state changes (e.g. toast, sidebar) don't re-render the page.
+  const handleEditAnnotation = useCallback(
+    (ann: AnnotationInfo) =>
+      setEditor({ annotation: ann, page, revisionId: revision?.id ?? "" }),
+    [page, revision?.id],
+  );
+  const handleText = useCallback(
+    (rect: number[], type: "Text" | "FreeText") => {
+      setTextModalFontSize(String(preferences.defaultFontSize || 14));
+      setTextModalFont("Helv");
+      setTextModalColor(
+        type === "FreeText"
+          ? preferences.defaultTextColor || "#1f2421"
+          : preferences.annotationColor,
+      );
+      setInput("");
+      setModalError("");
+      setModal({ kind: "text", type, rect });
+    },
+    [
+      preferences.defaultFontSize,
+      preferences.defaultTextColor,
+      preferences.annotationColor,
+    ],
+  );
+  const handleStamp = useCallback((rect: number[]) => {
+    setPendingStampRect(rect);
+    setSignatureModalOpen(true);
+  }, []);
   const printDocument = () =>
     void perform("Preparing all pages for print…", async () => {
       if (!pdf) return;
@@ -1737,32 +1773,10 @@ export default function App() {
                       selectedAnnotationId={selectedAnnotationId}
                       onSelectAnnotation={setSelectedAnnotationId}
                       onUpdateAnnotationRect={handleUpdateAnnotationRect}
-                      onEditAnnotation={(ann) =>
-                        setEditor({
-                          annotation: ann,
-                          page,
-                          revisionId: revision.id,
-                        })
-                      }
+                      onEditAnnotation={handleEditAnnotation}
                       onAnnotate={addAnnotation}
-                      onText={(rect, type) => {
-                        setTextModalFontSize(
-                          String(preferences.defaultFontSize || 14),
-                        );
-                        setTextModalFont("Helv");
-                        setTextModalColor(
-                          type === "FreeText"
-                            ? preferences.defaultTextColor || "#1f2421"
-                            : preferences.annotationColor,
-                        );
-                        setInput("");
-                        setModalError("");
-                        setModal({ kind: "text", type, rect });
-                      }}
-                      onStamp={(rect) => {
-                        setPendingStampRect(rect);
-                        setSignatureModalOpen(true);
-                      }}
+                      onText={handleText}
+                      onStamp={handleStamp}
                       onError={reportError}
                     />
                   ) : (
@@ -2078,6 +2092,7 @@ export default function App() {
       )}
       {editor && (
         <AnnotationEditor
+          key={`${editor.revisionId}:${editor.page}:${editor.annotation.id}`}
           annotation={editor.annotation}
           page={editor.page}
           onClose={() => setEditor(null)}

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 import { Check, PenLine, X } from "lucide-react";
 import type { AnnotationInfo, AnnotationPatch } from "../types";
 import {
@@ -29,7 +29,9 @@ export function AnnotationEditor({
   onClose: () => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
-  const [contents, setContents] = useState(annotation.contents);
+  // Uncontrolled textarea — read via ref only at submit time, eliminating
+  // a full React render cycle on every keystroke.
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const originalColor = annotationHex(annotation.color);
   const [color, setColor] = useState(originalColor);
   const [width, setWidth] = useState(String(annotation.width ?? 2));
@@ -41,13 +43,16 @@ export function AnnotationEditor({
   const [fillColor, setFillColor] = useState(originalFill);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // isDirty tracks whether any field has changed so the Save button can be
+  // enabled/disabled without re-reading the textarea on every render.
+  const [isDirty, setIsDirty] = useState(false);
 
   const isFreeText = annotation.type === "FreeText";
   const isStickyNote = annotation.type === "Text";
   const textAnnotation = isStickyNote || isFreeText;
 
-  const dirty =
-    contents !== annotation.contents ||
+  // Recompute dirty when style fields change (textarea is handled via isDirty).
+  const styleDirty =
     color !== originalColor ||
     (annotation.width !== null &&
       (!width.trim() || Number(width) !== annotation.width)) ||
@@ -56,17 +61,21 @@ export function AnnotationEditor({
         font !== (annotation.font ?? "Helv") ||
         fillColor !== originalFill));
 
+  const dirty = isDirty || styleDirty;
+
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
 
   useEffect(() => {
     setError("");
-  }, [contents, color, width, fontSize, font, fillColor]);
+  }, [color, width, fontSize, font, fillColor]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!dirty || busy) return;
+    // Read textarea value at submit time — no per-keystroke state overhead.
+    const contents = textareaRef.current?.value ?? annotation.contents;
     setError("");
     if (textAnnotation && !contents.trim()) {
       setError("Add some text first.");
@@ -122,7 +131,9 @@ export function AnnotationEditor({
           : "Could not update this annotation.",
       );
     } finally {
-      setBusy(false);
+      // startTransition marks busy=false as a non-urgent update so the UI
+      // remains responsive while the PDF re-renders after a successful save.
+      startTransition(() => setBusy(false));
     }
   };
 
@@ -162,12 +173,13 @@ export function AnnotationEditor({
             {textAnnotation ? "Text" : "Comment"}
           </label>
           <textarea
+            ref={textareaRef}
             id="annotation-contents"
             aria-label="Annotation contents"
             autoFocus
             rows={4}
-            value={contents}
-            onChange={(event) => setContents(event.target.value)}
+            defaultValue={annotation.contents}
+            onChange={() => setIsDirty(true)}
             maxLength={5000}
             placeholder={
               textAnnotation ? "Your text…" : "Add a comment to this mark…"
