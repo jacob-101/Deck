@@ -29,17 +29,19 @@ function annotationLocked(annotation: mupdf.PDFAnnotation) {
   );
 }
 
-function open(bytes: Uint8Array) {
+export function openPDF(bytes: Uint8Array, password?: string) {
   if (bytes.byteLength > MAX_FILE_SIZE)
     throw new Error("This release supports PDFs up to 50 MB.");
   if (new TextDecoder().decode(bytes.subarray(0, 5)) !== "%PDF-")
     throw new Error("This is not a valid PDF file.");
   const doc = new mupdf.PDFDocument(bytes);
   if (doc.needsPassword()) {
-    doc.destroy();
-    throw new Error(
-      "Password-protected PDFs are not supported yet. Open an unlocked copy.",
-    );
+    if (!password || !doc.authenticatePassword(password)) {
+      doc.destroy();
+      throw new Error(
+        "Password-protected PDF. Enter the correct password to unlock it.",
+      );
+    }
   }
   doc.disableJS();
   if (doc.countPages() === 0 || doc.countPages() > 500) {
@@ -48,7 +50,7 @@ function open(bytes: Uint8Array) {
   }
   return doc;
 }
-function serialize(doc: mupdf.PDFDocument) {
+export function serializePDF(doc: mupdf.PDFDocument) {
   const buffer = doc.saveToBuffer("garbage=4,compress");
   try {
     const bytes = buffer.asUint8Array().slice();
@@ -117,64 +119,67 @@ function readOutline(
     };
   }
 }
+export function inspectDocument(doc: mupdf.PDFDocument): DocumentInfo {
+  return {
+    title: doc.getMetaData("info:Title") ?? "",
+    author: doc.getMetaData("info:Author") ?? "",
+    subject: doc.getMetaData("info:Subject") ?? "",
+    creator: doc.getMetaData("info:Creator") ?? "",
+    producer: doc.getMetaData("info:Producer") ?? "",
+    format: doc.getMetaData("format") ?? "PDF",
+    ...readOutline(doc),
+    pages: Array.from({ length: doc.countPages() }, (_, index) => {
+      const page = doc.loadPage(index);
+      const object = page.getObject();
+      const rotate = object.getInheritable("Rotate");
+      const annots = page.getAnnotations();
+      try {
+        const bounds = page.getBounds();
+        return {
+          width: bounds[2] - bounds[0],
+          height: bounds[3] - bounds[1],
+          rotation: rotate.asNumber() || 0,
+          annotations: annots.map((annotation, id) => {
+            const isFreeText = annotation.getType() === "FreeText";
+            const appearance = isFreeText
+              ? annotation.getDefaultAppearance()
+              : null;
+            const background = isFreeText ? annotation.getColor() : [];
+            const rect = annotation.hasRect()
+              ? annotation.getRect()
+              : [0, 0, 0, 0];
+            return {
+              id,
+              type: annotation.getType(),
+              contents: annotation.getContents(),
+              color: isFreeText ? appearance!.color : annotation.getColor(),
+              fontSize: isFreeText ? appearance!.size : null,
+              font: isFreeText ? appearance!.font : null,
+              fillColor: isFreeText && background.length ? background : null,
+              rect: [rect[0], rect[1], rect[2], rect[3]],
+              width: annotation.hasBorder()
+                ? annotation.getBorderWidth()
+                : null,
+              editable:
+                editableTypes.has(annotation.getType()) &&
+                !annotationLocked(annotation),
+              locked: annotationLocked(annotation),
+            };
+          }),
+        };
+      } finally {
+        for (const annotation of annots) annotation.destroy();
+        rotate.destroy();
+        object.destroy();
+        page.destroy();
+      }
+    }),
+  };
+}
 export function inspect(bytes: Uint8Array): DocumentInfo {
-  const doc = open(bytes);
+  const doc = openPDF(bytes);
   try {
-    return {
-      title: doc.getMetaData("info:Title") ?? "",
-      author: doc.getMetaData("info:Author") ?? "",
-      subject: doc.getMetaData("info:Subject") ?? "",
-      creator: doc.getMetaData("info:Creator") ?? "",
-      producer: doc.getMetaData("info:Producer") ?? "",
-      format: doc.getMetaData("format") ?? "PDF",
-      ...readOutline(doc),
-      pages: Array.from({ length: doc.countPages() }, (_, index) => {
-        const page = doc.loadPage(index);
-        const object = page.getObject();
-        const rotate = object.getInheritable("Rotate");
-        const annots = page.getAnnotations();
-        try {
-          const bounds = page.getBounds();
-          return {
-            width: bounds[2] - bounds[0],
-            height: bounds[3] - bounds[1],
-            rotation: rotate.asNumber() || 0,
-            annotations: annots.map((annotation, id) => {
-              const isFreeText = annotation.getType() === "FreeText";
-              const appearance = isFreeText
-                ? annotation.getDefaultAppearance()
-                : null;
-              const background = isFreeText ? annotation.getColor() : [];
-              const rect = annotation.hasRect()
-                ? annotation.getRect()
-                : [0, 0, 0, 0];
-              return {
-                id,
-                type: annotation.getType(),
-                contents: annotation.getContents(),
-                color: isFreeText ? appearance!.color : annotation.getColor(),
-                fontSize: isFreeText ? appearance!.size : null,
-                font: isFreeText ? appearance!.font : null,
-                fillColor: isFreeText && background.length ? background : null,
-                rect: [rect[0], rect[1], rect[2], rect[3]],
-                width: annotation.hasBorder()
-                  ? annotation.getBorderWidth()
-                  : null,
-                editable:
-                  editableTypes.has(annotation.getType()) &&
-                  !annotationLocked(annotation),
-                locked: annotationLocked(annotation),
-              };
-            }),
-          };
-        } finally {
-          for (const annotation of annots) annotation.destroy();
-          rotate.destroy();
-          object.destroy();
-          page.destroy();
-        }
-      }),
-    };
+    return inspectDocument(doc);
   } finally {
     doc.destroy();
   }
@@ -367,96 +372,99 @@ function addAnnotation(page: mupdf.PDFPage, input: AnnotationInput) {
     annotation.destroy();
   }
 }
-export function edit(bytes: Uint8Array, command: EditCommand): Uint8Array {
-  const doc = open(bytes);
-  try {
-    if ("page" in command) checkPage(doc, command.page);
-    switch (command.type) {
-      case "rotate": {
-        const page = doc.findPage(command.page);
-        const rotation = page.getInheritable("Rotate");
-        try {
-          page.put(
-            "Rotate",
-            ((rotation.asNumber() || 0) + command.angle + 360) % 360,
-          );
-        } finally {
-          rotation.destroy();
-          page.destroy();
-        }
-        break;
+export function editDocument(doc: mupdf.PDFDocument, command: EditCommand) {
+  if ("page" in command) checkPage(doc, command.page);
+  switch (command.type) {
+    case "rotate": {
+      const page = doc.findPage(command.page);
+      const rotation = page.getInheritable("Rotate");
+      try {
+        page.put(
+          "Rotate",
+          ((rotation.asNumber() || 0) + command.angle + 360) % 360,
+        );
+      } finally {
+        rotation.destroy();
+        page.destroy();
       }
-      case "delete":
-        if (doc.countPages() === 1)
-          throw new Error("Keep at least one page in the document.");
-        doc.deletePage(command.page);
-        break;
-      case "duplicate": {
-        // Clone the page through a separate document so changes to the duplicate are independent.
-        const source = open(bytes);
-        try {
-          copyPage(doc, command.page + 1, source, command.page);
-        } finally {
-          source.destroy();
-        }
-        break;
-      }
-      case "reorder":
-        if (
-          command.order.length !== doc.countPages() ||
-          new Set(command.order).size !== command.order.length
-        )
-          throw new Error("Invalid page order.");
-        command.order.forEach((index) => checkPage(doc, index));
-        doc.rearrangePages(command.order);
-        break;
-      case "merge": {
-        const source = open(command.bytes);
-        try {
-          if (source.countPages() + doc.countPages() > 500)
-            throw new Error("The combined PDF exceeds 500 pages.");
-          for (let index = 0; index < source.countPages(); index++)
-            copyPage(doc, -1, source, index);
-        } finally {
-          source.destroy();
-        }
-        break;
-      }
-      case "annotate": {
-        const page = doc.loadPage(command.page);
-        try {
-          addAnnotation(page, command.annotation);
-        } finally {
-          page.destroy();
-        }
-        break;
-      }
-      case "update-annotation":
-      case "remove-annotation": {
-        const page = doc.loadPage(command.page);
-        const annotations = page.getAnnotations();
-        try {
-          const annotation = annotations[command.id];
-          if (!Number.isInteger(command.id) || !annotation)
-            throw new Error("This annotation no longer exists.");
-          if (annotationLocked(annotation))
-            throw new Error("This annotation is locked by the document.");
-          if (command.type === "update-annotation")
-            updateAnnotation(annotation, command.patch);
-          else page.deleteAnnotation(annotation);
-        } finally {
-          annotations.forEach((annotation) => annotation.destroy());
-          page.destroy();
-        }
-        break;
-      }
+      break;
     }
-    return serialize(doc);
+    case "delete":
+      if (doc.countPages() === 1)
+        throw new Error("Keep at least one page in the document.");
+      doc.deletePage(command.page);
+      break;
+    case "duplicate": {
+      // Clone the page through a separate document so changes to the duplicate are independent.
+      const source = new mupdf.PDFDocument(doc);
+      try {
+        copyPage(doc, command.page + 1, source, command.page);
+      } finally {
+        source.destroy();
+      }
+      break;
+    }
+    case "reorder":
+      if (
+        command.order.length !== doc.countPages() ||
+        new Set(command.order).size !== command.order.length
+      )
+        throw new Error("Invalid page order.");
+      command.order.forEach((index) => checkPage(doc, index));
+      doc.rearrangePages(command.order);
+      break;
+    case "merge": {
+      const source = openPDF(command.bytes);
+      try {
+        if (source.countPages() + doc.countPages() > 500)
+          throw new Error("The combined PDF exceeds 500 pages.");
+        for (let index = 0; index < source.countPages(); index++)
+          copyPage(doc, -1, source, index);
+      } finally {
+        source.destroy();
+      }
+      break;
+    }
+    case "annotate": {
+      const page = doc.loadPage(command.page);
+      try {
+        addAnnotation(page, command.annotation);
+      } finally {
+        page.destroy();
+      }
+      break;
+    }
+    case "update-annotation":
+    case "remove-annotation": {
+      const page = doc.loadPage(command.page);
+      const annotations = page.getAnnotations();
+      try {
+        const annotation = annotations[command.id];
+        if (!Number.isInteger(command.id) || !annotation)
+          throw new Error("This annotation no longer exists.");
+        if (annotationLocked(annotation))
+          throw new Error("This annotation is locked by the document.");
+        if (command.type === "update-annotation")
+          updateAnnotation(annotation, command.patch);
+        else page.deleteAnnotation(annotation);
+      } finally {
+        annotations.forEach((annotation) => annotation.destroy());
+        page.destroy();
+      }
+      break;
+    }
+  }
+}
+export function edit(bytes: Uint8Array, command: EditCommand): Uint8Array {
+  const doc = openPDF(bytes);
+  try {
+    editDocument(doc, command);
+    return serializePDF(doc);
   } finally {
     doc.destroy();
   }
 }
-function copyPage(
+export function copyPage(
   target: mupdf.PDFDocument,
   at: number,
   source: mupdf.PDFDocument,
@@ -501,13 +509,13 @@ function copyPage(
   }
 }
 export function extract(bytes: Uint8Array, indices: number[]) {
-  const doc = open(bytes);
+  const doc = openPDF(bytes);
   try {
     if (!indices.length || new Set(indices).size !== indices.length)
       throw new Error("Select at least one unique page.");
     indices.forEach((index) => checkPage(doc, index));
     doc.rearrangePages(indices);
-    return serialize(doc);
+    return serializePDF(doc);
   } finally {
     doc.destroy();
   }
@@ -662,7 +670,7 @@ export function createSample(): Uint8Array {
     } finally {
       outline.destroy();
     }
-    return serialize(doc);
+    return serializePDF(doc);
   } finally {
     f1.destroy();
     f2.destroy();
@@ -757,7 +765,7 @@ export function imagesToPDF(
         image.destroy();
       }
     }
-    return serialize(doc);
+    return serializePDF(doc);
   } finally {
     doc.destroy();
   }

@@ -161,6 +161,31 @@ try {
   steps.push(
     "Native Settings, system appearance, live palettes, reduced motion and reload persistence",
   );
+  const publishedMarkdownPDF = join(temp, "Published Markdown.pdf");
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath: path });
+  }, publishedMarkdownPDF);
+  await page.getByRole("button", { name: /Markdown to PDF/ }).click();
+  const markup = page.getByRole("dialog", {
+    name: "Markdown to PDF",
+    exact: true,
+  });
+  await expect(markup).toBeVisible();
+  await markup.getByRole("button", { name: "Create PDF", exact: true }).click();
+  await ready();
+  await expect(page.locator(".textLayer")).toContainText(
+    "beautifully simple document",
+  );
+  expect((await readFile(publishedMarkdownPDF)).subarray(0, 5).toString()).toBe(
+    "%PDF-",
+  );
+  steps.push(
+    "Enhanced offline Markdown publisher creates and opens a styled PDF",
+  );
+  await page.reload();
+  await expect(
+    page.getByRole("heading", { name: "Your PDFs. On your terms." }),
+  ).toBeVisible();
   await page.getByRole("button", { name: /Take a look around/ }).click();
   await ready();
   await noBusy();
@@ -172,6 +197,72 @@ try {
     path: join(output, "reader.png"),
   });
   steps.push("Worker generated and rendered actual PDF with selectable text");
+  await page.getByRole("button", { name: "PDF Tools", exact: true }).click();
+  const pdfTools = page.getByRole("dialog", { name: "PDF Tools", exact: true });
+  await expect(pdfTools).toBeVisible();
+  await pdfTools.getByRole("button", { name: /Edit Metadata/ }).click();
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "pdf-tools.png"),
+  });
+  await pdfTools.getByLabel("Title", { exact: true }).fill("Fast Tool Suite");
+  await pdfTools
+    .getByRole("button", { name: "Apply to PDF", exact: true })
+    .click();
+  await noBusy();
+  await expect(pdfTools).not.toBeVisible();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await ready();
+  const exactDocx = join(temp, "Field Notes Exact.docx");
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showSaveDialog = async () => ({ canceled: false, filePath: path });
+  }, exactDocx);
+  await page.getByRole("button", { name: "PDF Tools", exact: true }).click();
+  await pdfTools.getByRole("button", { name: /PDF to DOCX/ }).click();
+  await pdfTools.getByRole("button", { name: "Export", exact: true }).click();
+  await expect(pdfTools).not.toBeVisible({ timeout: 30000 });
+  expect((await readFile(exactDocx)).subarray(0, 2).toString()).toBe("PK");
+  steps.push("Unified PDF Tools metadata edit and layout-accurate DOCX export");
+  await app.evaluate(({ dialog }, path) => {
+    dialog.showOpenDialog = async () => ({
+      canceled: false,
+      filePaths: [path],
+    });
+  }, temp);
+  await page.getByRole("button", { name: "PDF Tools", exact: true }).click();
+  await pdfTools.getByRole("button", { name: /PDF to Images/ }).click();
+  await pdfTools.getByLabel("Resolution").selectOption("144");
+  await pdfTools.getByRole("button", { name: "Export", exact: true }).click();
+  await expect(pdfTools).not.toBeVisible({ timeout: 30000 });
+  const pageImageExportFolder = (
+    await readdir(temp, { withFileTypes: true })
+  ).find(
+    (entry) => entry.isDirectory() && entry.name.startsWith("OpenPDF export "),
+  );
+  expect(pageImageExportFolder).toBeTruthy();
+  const exportedPages = await readdir(join(temp, pageImageExportFolder.name));
+  expect(exportedPages).toHaveLength(4);
+  expect(
+    (
+      await readFile(join(temp, pageImageExportFolder.name, exportedPages[0]))
+    ).subarray(0, 4),
+  ).toEqual(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+  steps.push("PDF Tools exports every page as a verified high-quality PNG");
+  await page.getByRole("button", { name: "PDF Tools", exact: true }).click();
+  await pdfTools.getByRole("button", { name: /Privacy Scanner/ }).click();
+  await expect(pdfTools).toContainText("metadata fields", { timeout: 30000 });
+  await page.screenshot({
+    animations: "disabled",
+    path: join(output, "privacy-scanner.png"),
+  });
+  await pdfTools
+    .getByRole("button", { name: "Clean private data", exact: true })
+    .click();
+  await noBusy();
+  await expect(pdfTools).not.toBeVisible();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await ready();
+  steps.push("Local privacy scan reports and cleans hidden document data");
   const markdown = join(temp, "Field Notes.md");
   await app.evaluate(({ dialog }, path) => {
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: path });
@@ -687,6 +778,9 @@ try {
   expect(extractedDoc.countPages()).toBe(2);
   extractedDoc.destroy();
   steps.push("Page range extraction writes a separate two-page PDF");
+  const exportFoldersBeforeSplit = new Set(
+    (await readdir(temp)).filter((name) => name.startsWith("OpenPDF export")),
+  );
   await app.evaluate(({ dialog }, path) => {
     dialog.showOpenDialog = async () => ({
       canceled: false,
@@ -696,9 +790,11 @@ try {
   await page.getByRole("button", { name: "Split", exact: true }).click();
   await page.getByRole("button", { name: "Export PDFs", exact: true }).click();
   await noBusy();
-  const exportFolder = (await readdir(temp)).find((name) =>
-    name.startsWith("OpenPDF export"),
+  const exportFolder = (await readdir(temp)).find(
+    (name) =>
+      name.startsWith("OpenPDF export") && !exportFoldersBeforeSplit.has(name),
   );
+  expect(exportFolder).toBeTruthy();
   expect(
     (await readdir(join(temp, exportFolder))).filter((name) =>
       name.endsWith(".pdf"),
@@ -764,7 +860,7 @@ try {
   steps.push("Reopen saved PDF from recent files with annotations intact");
   await page.getByRole("button", { name: "Settings", exact: true }).click();
   await settings.getByRole("button", { name: "Privacy", exact: true }).click();
-  await expect(settings).toContainText("2 documents in your recent list");
+  await expect(settings).toContainText("3 documents in your recent list");
   await page.screenshot({
     animations: "disabled",
     path: join(output, "settings-privacy.png"),

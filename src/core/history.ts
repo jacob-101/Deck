@@ -18,7 +18,12 @@ type History = {
     name: string,
     fileId: string | null,
   ) => void;
-  commit: (bytes: Uint8Array, info: DocumentInfo, label: string) => void;
+  commit: (
+    bytes: Uint8Array,
+    info: DocumentInfo,
+    label: string,
+    revisionId?: string,
+  ) => void;
   undo: () => void;
   redo: () => void;
   close: () => void;
@@ -40,11 +45,11 @@ export const useDocument = create<History>((set, get) => ({
       fileId,
     });
   },
-  commit: (bytes, info, label) => {
+  commit: (bytes, info, label, revisionId) => {
     const state = get();
     const revisions = [
       ...state.revisions.slice(0, state.cursor + 1),
-      { id: crypto.randomUUID(), bytes, info, label },
+      { id: revisionId ?? crypto.randomUUID(), bytes, info, label },
     ];
     let memory = revisions.reduce((sum, entry) => sum + entry.bytes.length, 0);
     while (

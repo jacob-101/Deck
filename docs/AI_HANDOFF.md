@@ -1,5 +1,7 @@
 # OpenPDF Studio: independent audit and improvement handoff
 
+> **Historical 0.3.0 handoff:** Add Text, visible signing, OCR, image conversion, and the 0.4.0 PDF Tools suite were implemented after this prompt was written. Use `README.md` and `docs/VERIFICATION.md` as the current source of truth before acting on any “missing” claim below.
+
 Prepared 2026-08-28 for another coding agent. This is an instruction prompt, not a claim that the missing features are implemented.
 
 ## Locations and baseline

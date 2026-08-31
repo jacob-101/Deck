@@ -8,6 +8,7 @@ import {
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
   BookOpen,
+  Braces,
   LockKeyhole,
   Pencil,
   ArrowDown,
@@ -23,6 +24,7 @@ import {
   Copy,
   Download,
   FilePlus2,
+  FileOutput,
   FileText,
   FileSearch,
   FolderOpen,
@@ -94,6 +96,9 @@ import { DocumentDetails } from "./components/DocumentDetails";
 import { DocumentAnalysis } from "./components/DocumentAnalysis";
 import { ImagePDFEditor } from "./components/ImagePDFEditor";
 import { DocumentOutline } from "./components/DocumentOutline";
+import { PDFTools } from "./components/PDFTools";
+import { MarkupConverter } from "./components/MarkupConverter";
+import { UnlockPDF } from "./components/UnlockPDF";
 import { annotationHex, annotationName } from "./core/annotation-style";
 GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -237,6 +242,23 @@ export default function App() {
   const [modalError, setModalError] = useState("");
   const [signatureModalOpen, setSignatureModalOpen] = useState(false);
   const [imageEditor, setImageEditor] = useState<ImageFile[] | null>(null);
+  const [toolsOpen, setToolsOpen] = useState<
+    | null
+    | "split"
+    | "mix"
+    | "sheet"
+    | "mirror"
+    | "form"
+    | "metadata"
+    | "bates"
+    | "images"
+    | "unlock"
+    | "docx"
+  >(null);
+  const [markupConverter, setMarkupConverter] = useState<
+    "markdown" | "latex" | null
+  >(null);
+  const [unlockFile, setUnlockFile] = useState<OpenFile | null>(null);
   const [selectedAnnotationId, setSelectedAnnotationId] = useState<
     number | null
   >(null);
@@ -544,19 +566,27 @@ export default function App() {
       if (filePurpose.current === "open" && !(await confirmLeave())) return;
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (filePurpose.current === "merge" && revision) {
-        const result = await pdfEngine.edit(revision.bytes, {
-          type: "merge",
-          bytes,
-        });
-        state.commit(result.bytes, result.info, "Merge PDF");
+        const result = await pdfEngine.editSession(
+          revision.bytes,
+          {
+            type: "merge",
+            bytes,
+          },
+          revision.id,
+        );
+        state.commit(result.bytes, result.info, "Merge PDF", result.revisionId);
         setPage(count);
       } else await loadFile({ id: null, name: file.name, bytes });
     });
   const applyEdit = (command: EditCommand, label: string, nextPage?: number) =>
     void perform(label + "…", async () => {
       if (!revision) return;
-      const result = await pdfEngine.edit(revision.bytes, command);
-      state.commit(result.bytes, result.info, label);
+      const result = await pdfEngine.editSession(
+        revision.bytes,
+        command,
+        revision.id,
+      );
+      state.commit(result.bytes, result.info, label, result.revisionId);
       if (nextPage !== undefined) setPage(nextPage);
     });
   const saveAnnotation = async (patch: AnnotationPatch) => {
@@ -571,13 +601,22 @@ export default function App() {
     busyRef.current = true;
     setBusy("Updating annotation…");
     try {
-      const result = await pdfEngine.edit(entry.bytes, {
-        type: "update-annotation",
-        page: editor.page,
-        id: editor.annotation.id,
-        patch,
-      });
-      current.commit(result.bytes, result.info, "Edit annotation");
+      const result = await pdfEngine.editSession(
+        entry.bytes,
+        {
+          type: "update-annotation",
+          page: editor.page,
+          id: editor.annotation.id,
+          patch,
+        },
+        entry.id,
+      );
+      current.commit(
+        result.bytes,
+        result.info,
+        "Edit annotation",
+        result.revisionId,
+      );
       setEditor(null);
       notify("Annotation updated. Save the PDF to keep your changes.");
     } finally {
@@ -1044,6 +1083,22 @@ export default function App() {
       await loadFile(converted);
       notify(`Word document converted locally with ${converted.engine}.`);
     });
+  const openToolWithPDF = (tool: NonNullable<typeof toolsOpen>) =>
+    void perform("Opening PDF tool…", async () => {
+      if (!window.desktop)
+        throw new Error("PDF Tools are available in the Mac app.");
+      const file = await window.desktop.pickPDF();
+      if (!file) return;
+      await loadFile(file);
+      setToolsOpen(tool);
+    });
+  const chooseProtectedPDF = () =>
+    void perform("Opening protected PDF…", async () => {
+      if (!window.desktop)
+        throw new Error("Unlock PDF is available in the Mac app.");
+      const file = await window.desktop.pickPDF();
+      if (file) setUnlockFile(file);
+    });
   return (
     <div
       className={`app ${dragging ? "dragging-file" : ""}`}
@@ -1144,6 +1199,13 @@ export default function App() {
               >
                 <FileSearch size={17} />
               </IconButton>
+              <button
+                className="text-button tools-button"
+                disabled={!!busy}
+                onClick={() => setToolsOpen("split")}
+              >
+                <Braces size={16} /> PDF Tools
+              </button>
               <button
                 className="text-button"
                 disabled={!!busy}
@@ -1308,6 +1370,13 @@ export default function App() {
                 onClick={() => setModal({ kind: "split" })}
               >
                 <Scissors size={16} /> Split
+              </button>
+              <button
+                className="text-button"
+                disabled={!canEdit}
+                onClick={() => setToolsOpen("mix")}
+              >
+                <Braces size={16} /> All tools
               </button>
               <span className="context-hint">Drag pages to reorder</span>
             </div>
@@ -1842,6 +1911,43 @@ export default function App() {
                     DOC or DOCX · local conversion
                   </span>
                 </button>
+                <button
+                  disabled={!!busy}
+                  onClick={() => openToolWithPDF("docx")}
+                >
+                  <FileOutput size={17} />
+                  <span>
+                    <strong>PDF to Word</strong>
+                    Exact layout or editable text
+                  </span>
+                </button>
+                <button
+                  disabled={!!busy}
+                  onClick={() => setMarkupConverter("markdown")}
+                >
+                  <BookOpen size={17} />
+                  <span>
+                    <strong>Markdown to PDF</strong>
+                    Polished A4 publishing
+                  </span>
+                </button>
+                <button
+                  disabled={!!busy}
+                  onClick={() => setMarkupConverter("latex")}
+                >
+                  <Braces size={17} />
+                  <span>
+                    <strong>LaTeX to PDF</strong>
+                    Native TeX with offline fallback
+                  </span>
+                </button>
+                <button disabled={!!busy} onClick={chooseProtectedPDF}>
+                  <LockKeyhole size={17} />
+                  <span>
+                    <strong>Unlock PDF</strong>
+                    Save a password-free copy
+                  </span>
+                </button>
               </div>
               <button
                 className="sample-button"
@@ -2005,6 +2111,34 @@ export default function App() {
             await window.desktop?.clearRecents();
             setRecents([]);
           }}
+        />
+      )}
+      {toolsOpen && revision && (
+        <PDFTools
+          bytes={revision.bytes}
+          name={state.name}
+          info={revision.info}
+          initialTool={toolsOpen}
+          onClose={() => setToolsOpen(null)}
+          onReplace={(result, label) => {
+            state.commit(result.bytes, result.info, label);
+            setPage(0);
+          }}
+          notify={notify}
+        />
+      )}
+      {markupConverter && (
+        <MarkupConverter
+          initialFormat={markupConverter}
+          onClose={() => setMarkupConverter(null)}
+          onConverted={loadFile}
+        />
+      )}
+      {unlockFile && (
+        <UnlockPDF
+          file={unlockFile}
+          onClose={() => setUnlockFile(null)}
+          onUnlocked={loadFile}
         />
       )}
       {busy && (
@@ -2266,10 +2400,10 @@ export default function App() {
               </div>
               <p className="subtle">
                 Local Apple Vision OCR supports up to 100 selected pages per
-                run. This release does not edit existing PDF text or support
-                protected PDFs, forms, or digital signatures. Saves can
-                invalidate existing signatures. Documents: up to 50 MB / 500
-                pages.
+                run. This release fills existing forms and unlocks protected
+                copies, but does not edit existing page text or create
+                cryptographic signatures. Saves can invalidate existing
+                signatures. Documents: up to 50 MB / 500 pages.
               </p>
             </>
           )}

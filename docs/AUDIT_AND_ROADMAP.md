@@ -1,4 +1,6 @@
-# OpenPDF Studio: Comprehensive Product Audit & Roadmap
+# OpenPDF Studio: Version 0.3 Product Audit & Roadmap
+
+> **Historical snapshot:** This audit records the 0.3.0 state on 2026-08-28. It is preserved as release history. For current 0.4.0 capabilities and verification, use `README.md` and `docs/VERIFICATION.md`; form filling, OCR, image extraction, advanced splitting, conversion, and password unlocking have since shipped.
 
 **Date:** 2026-08-28  
 **Release:** OpenPDF Studio 0.3.0  

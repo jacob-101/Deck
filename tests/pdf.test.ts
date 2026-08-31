@@ -9,6 +9,67 @@ import {
   imagesToPDF,
 } from "../src/core/pdf";
 import { useDocument } from "../src/core/history";
+import {
+  addBatesNumbers,
+  alternateMix,
+  cleanPrivacy,
+  cropResizePDF,
+  docxPages,
+  encryptPDF,
+  extractImages,
+  flattenPDF,
+  fillForm,
+  listFormFields,
+  mirrorPages,
+  optimizePDF,
+  pagesPerSheet,
+  pdfPagesToImages,
+  scanPrivacy,
+  splitDocument,
+  unlockPDF,
+  updateMetadata,
+} from "../src/core/document-tools";
+
+function createTextFormPDF() {
+  const doc = new mupdf.PDFDocument();
+  const font = new mupdf.Font("Helvetica");
+  const fontRef = doc.addSimpleFont(font);
+  const pageRef = doc.addPage(
+    [0, 0, 300, 200],
+    0,
+    { Font: { Helv: fontRef } },
+    "BT /Helv 12 Tf 20 150 Td (Name:) Tj ET",
+  );
+  doc.insertPage(-1, pageRef);
+  const widget = doc.newDictionary();
+  widget.put("Type", doc.newName("Annot"));
+  widget.put("Subtype", doc.newName("Widget"));
+  widget.put("FT", doc.newName("Tx"));
+  widget.put("T", doc.newString("FullName"));
+  widget.put("TU", doc.newString("Full name"));
+  widget.put("V", doc.newString("Jacob"));
+  widget.put("Rect", [70, 135, 250, 165]);
+  widget.put("DA", doc.newString("/Helv 12 Tf 0 g"));
+  widget.put("P", pageRef);
+  const widgetRef = doc.addObject(widget);
+  pageRef.put("Annots", [widgetRef]);
+  const acroForm = doc.newDictionary();
+  acroForm.put("Fields", [widgetRef]);
+  acroForm.put("DA", doc.newString("/Helv 12 Tf 0 g"));
+  acroForm.put("DR", { Font: { Helv: fontRef } });
+  doc.getTrailer().get("Root").put("AcroForm", acroForm);
+  const buffer = doc.saveToBuffer("garbage=4,compress");
+  const bytes = buffer.asUint8Array().slice();
+  buffer.destroy();
+  acroForm.destroy();
+  widgetRef.destroy();
+  widget.destroy();
+  pageRef.destroy();
+  fontRef.destroy();
+  font.destroy();
+  doc.destroy();
+  return bytes;
+}
 import type { AnnotationInput } from "../src/types";
 import { annotationHex } from "../src/core/annotation-style";
 let sample: Uint8Array;
@@ -635,6 +696,186 @@ describe("actual PDF operations", () => {
     }
   });
 });
+describe("advanced local document tools", () => {
+  it("updates metadata and applies printable Bates numbers", () => {
+    const metadata = updateMetadata(sample, {
+      title: "Tool Suite",
+      author: "OpenPDF",
+      subject: "Verification",
+      keywords: "pdf, local",
+      creator: "OpenPDF Studio",
+    });
+    expect(metadata.info.title).toBe("Tool Suite");
+    const numbered = addBatesNumbers(metadata.bytes, {
+      prefix: "CASE-",
+      suffix: "",
+      start: 25,
+      digits: 5,
+      position: "bottom-right",
+    });
+    expect(numbered.info.pages).toHaveLength(4);
+    expect(numbered.info.pages[0].annotations.at(-1)?.contents).toBe(
+      "CASE-00025",
+    );
+    expect(numbered.info.pages[3].annotations.at(-1)?.contents).toBe(
+      "CASE-00028",
+    );
+  });
+
+  it("reads and fills standard PDF text form fields", () => {
+    const form = createTextFormPDF();
+    const fields = listFormFields(form);
+    expect(fields).toMatchObject([
+      {
+        id: "0:0",
+        name: "FullName",
+        label: "Full name",
+        value: "Jacob",
+        readOnly: false,
+      },
+    ]);
+    const filled = fillForm(form, { "0:0": "OpenPDF Studio" });
+    expect(listFormFields(filled.bytes)[0].value).toBe("OpenPDF Studio");
+  });
+
+  it("mixes, mirrors and imposes pages without changing the source", () => {
+    const twoPages = extract(sample, [0, 1]);
+    const mixed = alternateMix(twoPages, extract(sample, [2]), true);
+    expect(mixed.info.pages).toHaveLength(3);
+    expect(pageText(mixed.bytes, 0)).toContain("A little less friction");
+    expect(pageText(mixed.bytes, 1)).toContain("Put every page");
+    const mirrored = mirrorPages(twoPages, "horizontal");
+    expect(mirrored.info.pages).toHaveLength(2);
+    const imposed = pagesPerSheet(sample, 4);
+    expect(imposed.info.pages).toHaveLength(1);
+    expect(inspect(sample).pages).toHaveLength(4);
+  });
+
+  it("splits by page count, half, text and target size", () => {
+    expect(splitDocument(sample, "Field Notes.pdf", "pages", "2")).toHaveLength(
+      2,
+    );
+    expect(splitDocument(sample, "Field Notes.pdf", "half", "")).toHaveLength(
+      2,
+    );
+    expect(
+      splitDocument(sample, "Field Notes.pdf", "text", "Put every page"),
+    ).toHaveLength(2);
+    expect(
+      splitDocument(sample, "Field Notes.pdf", "size", "1").length,
+    ).toBeGreaterThan(0);
+  });
+
+  it("extracts embedded images, prepares both DOCX modes and removes encryption", () => {
+    const pixmap = new mupdf.Pixmap(
+      mupdf.ColorSpace.DeviceRGB,
+      [0, 0, 10, 10],
+      false,
+    );
+    pixmap.clear(180);
+    const imagePDF = imagesToPDF([
+      { name: "square.png", bytes: pixmap.asPNG() },
+    ]);
+    pixmap.destroy();
+    expect(extractImages(imagePDF, "Images.pdf")[0].name).toMatch(/\.png$/);
+    expect(docxPages(sample, "editable")[0].text).toContain(
+      "A little less friction",
+    );
+    expect(docxPages(extract(sample, [0]), "layout")[0].image?.[0]).toBe(0x89);
+    const encrypted = new mupdf.PDFDocument(sample);
+    const buffer = encrypted.saveToBuffer(
+      "encrypt=aes-256,user-password=secret,owner-password=owner",
+    );
+    const locked = buffer.asUint8Array().slice();
+    buffer.destroy();
+    encrypted.destroy();
+    const unlocked = unlockPDF(locked, "secret");
+    const reopened = new mupdf.PDFDocument(unlocked.bytes);
+    expect(reopened.needsPassword()).toBe(false);
+    reopened.destroy();
+  });
+
+  it("optimizes valid PDFs and renders every page as PNG or JPEG", () => {
+    const optimized = optimizePDF(sample);
+    expect(optimized.info.pages).toHaveLength(4);
+    expect(new TextDecoder().decode(optimized.bytes.subarray(0, 5))).toBe(
+      "%PDF-",
+    );
+    const png = pdfPagesToImages(
+      extract(sample, [0, 1]),
+      "Report.pdf",
+      "png",
+      144,
+      90,
+    );
+    expect(png).toHaveLength(2);
+    expect(Array.from(png[0].bytes.subarray(0, 4))).toEqual([
+      0x89, 0x50, 0x4e, 0x47,
+    ]);
+    const jpg = pdfPagesToImages(
+      extract(sample, [0]),
+      "Report.pdf",
+      "jpg",
+      72,
+      80,
+    );
+    expect(Array.from(jpg[0].bytes.subarray(0, 2))).toEqual([0xff, 0xd8]);
+  });
+
+  it("creates an AES-256 protected copy with the supplied password", () => {
+    const encrypted = encryptPDF(sample, "correct horse battery staple");
+    const document = new mupdf.PDFDocument(encrypted);
+    try {
+      expect(document.needsPassword()).toBe(true);
+      expect(document.authenticatePassword("wrong")).toBe(0);
+      expect(
+        document.authenticatePassword("correct horse battery staple"),
+      ).toBeGreaterThan(0);
+      expect(document.countPages()).toBe(4);
+    } finally {
+      document.destroy();
+    }
+  });
+
+  it("flattens marks and crops or standardizes page geometry", () => {
+    const annotated = edit(sample, {
+      type: "annotate",
+      page: 0,
+      annotation: note,
+    });
+    const flattened = flattenPDF(annotated);
+    expect(flattened.info.pages[0].annotations).toHaveLength(0);
+    const original = inspect(sample).pages[0];
+    const cropped = cropResizePDF(sample, 10, "keep");
+    expect(cropped.info.pages[0].width).toBeCloseTo(original.width * 0.8, 0);
+    expect(cropped.info.pages[0].height).toBeCloseTo(original.height * 0.8, 0);
+    const a4 = cropResizePDF(extract(sample, [0]), 5, "a4");
+    expect(a4.info.pages[0].width).toBeCloseTo(595, 0);
+    expect(a4.info.pages[0].height).toBeCloseTo(842, 0);
+  });
+
+  it("reports and cleans private metadata while preserving document content", () => {
+    const annotated = edit(
+      updateMetadata(sample, {
+        title: "Private title",
+        author: "Jacob",
+        subject: "Confidential",
+        keywords: "secret",
+        creator: "OpenPDF Studio",
+      }).bytes,
+      { type: "annotate", page: 0, annotation: note },
+    );
+    const report = scanPrivacy(annotated);
+    expect(report.metadata.some((entry) => entry.key === "Author")).toBe(true);
+    expect(report.annotations).toBe(1);
+    const cleaned = cleanPrivacy(annotated);
+    const after = scanPrivacy(cleaned.bytes);
+    expect(after.metadata).toHaveLength(0);
+    expect(after.annotations).toBe(1);
+    expect(pageText(cleaned.bytes)).toContain("A little less friction");
+  });
+});
+
 describe("page ranges and command history", () => {
   it("converts PDF colors for display without changing the PDF", () => {
     expect(annotationHex([0.5])).toBe("#808080");

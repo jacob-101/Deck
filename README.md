@@ -2,7 +2,7 @@
 
 A local PDF workspace for macOS. No accounts, no uploads, no telemetry.
 
-**Version 0.3:** editable annotation properties, embedded table-of-contents navigation, and native document details. Includes the Forest & Paper identity and persistent Settings workspace.
+**Version 0.4:** a revision-aware editing engine, a unified local PDF Tools workspace, accurate-layout and editable PDF-to-DOCX export, and offline Markdown/LaTeX publishing. Includes the Forest & Paper identity and persistent Settings workspace.
 
 ## Run
 
@@ -35,13 +35,16 @@ The application is generated in `release/mac-arm64/OpenPDF Studio.app` on Apple 
 - Local document analysis classifies text, scanned, image-based, and mixed PDFs; flags pages that may need OCR and detects tables/columns. A dedicated offline Apple Vision OCR workspace recognizes up to 100 selected pages per run in supported languages, previews the result, copies recognized text through the native Mac clipboard, and exports Markdown without uploading the PDF.
 - High-quality PNG/JPEG-to-PDF conversion supports 1–100 images with a visual preparation workspace. Crop with an adjustable frame, rotate in 90° steps, remove pages, add more images, and arrange page order before export. Crop and rotation are stored as PDF geometry, so original JPEG compression and source pixels stay embedded without downsampling or recompression.
 - Offline DOC/DOCX-to-PDF conversion uses an installed LibreOffice engine, with Apple Pages as a fallback. Converted PDFs open immediately with selectable text. Layout fidelity still depends on the fonts and document features available to the installed converter.
+- PDF-to-DOCX offers two honest modes: **Exact Layout** embeds high-resolution page renders for visual fidelity; **Editable Text** preserves selectable extracted text and page breaks for rewriting.
+- The offline Markdown publisher creates styled A4 PDFs with headings, lists, quotes, links, and code. LaTeX uses a restricted local MacTeX engine when installed and includes a built-in offline renderer for common sections, emphasis, lists, and inline formulas.
 - Standard PDF highlights, underline, strike-through, ink, rectangles, ellipses, arrows, text boxes, sticky notes, and visible signature stamps. Select text while a markup tool is active; drag to draw; click to place a note or text box.
 - **Add Text (FreeText):** place text boxes anywhere on the page with customizable font sizes (10–32 pt), font families (Helvetica, Courier, Times), dedicated text colors, transparent or colored PDF background fills, multiline/Unicode characters, and interactive move/resize bounding boxes on the page canvas.
 - **Sign (Stamp):** draw a signature, type in elegant script styles, or import PNG/JPEG images (with automatic background transparency removal). Move and resize signatures with proportional aspect-ratio preservation. Save signatures locally with explicit opt-in.
 - Annotation list, jump to annotated page, edit text/comments and color, adjust shape line weight, remove annotations. Locked annotations cannot be edited or deleted.
 - Embedded PDF table of contents, including nested sections and page destinations that follow page reordering. External destinations are not opened.
 - Document details: title, author, subject, creator, producer, PDF version, page dimensions, file size, and annotation count.
-- Rotate, duplicate, delete, drag or button reorder, merge, extract ranges, split to separate PDFs.
+- Unified **PDF Tools**: lossless structural compression; page export to PNG/JPEG at 144–600 DPI; AES-256 password protection; flattening; crop and A4/Letter resize; a local privacy scanner and metadata/action cleaner; split by page count, target size, halves, bookmark chapters, or matching text; alternate/mix two PDFs; 2/4/6/9 pages per sheet; flip/mirror; fill existing PDF forms; edit metadata; Bates numbering; extract embedded images; unlock password-protected copies; and PDF-to-DOCX.
+- Rotate, duplicate, delete, drag or button reorder, merge, and extract ranges.
 - Named document history with undo/redo; annotations and page operations restore actual PDF bytes.
 - Save, Save As, close confirmation, file-change conflict detection, atomic replacement of saved files.
 - Print the whole document (rasterized at 108 dpi in this first release).
@@ -78,13 +81,16 @@ Viewer defaults apply when opening a document. Appearance and annotation default
 
 ## Limits and cautions
 
-This is not full Acrobat parity. Existing text/image editing, scanner capture, form creation/filling, cryptographic signatures, compression, and redaction are not implemented. Drawing over text does **not** redact it.
+This is not full Acrobat parity. Editing existing page text/images, scanner capture, form creation, cryptographic signatures, lossy image recompression, and redaction are not implemented. Existing AcroForm fields can be filled. Structural compression may not shrink an already-optimized PDF. Drawing over text does **not** redact it.
 
-- Inputs: PDF only, up to 50 MB and 500 pages. Password-protected PDFs are rejected.
+- Inputs: PDF up to 50 MB and 500 pages. Password-protected PDFs can be opened through **Unlock PDF** with the correct password and saved as an unencrypted copy.
 - History: at most 40 revisions, normally within 96 MB; at least the current and previous revisions are retained. Closing the document clears history.
 - Print: up to 100 pages; oversized pages are rejected. It prints rendered page images, not vector text.
 - Split export: at most 100 MB of combined output per operation.
-- Saving is a full PDF rewrite. It can invalidate digital signatures. Use Save As for signed or important originals. The app does not claim PDF/A, form, tagged-PDF, accessibility-tree, attachment, or complex interactive-feature preservation.
+- PDF-to-image export: up to 100 pages and 100 MB of combined output per operation. PNG is lossless; JPEG uses the selected quality.
+- Privacy cleaning removes metadata, embedded files, and document-level open/JavaScript actions. It reports but preserves links, annotations, and form fields.
+- Crop with original dimensions preserves vectors and selectable text. Resizing to A4 or Letter creates a high-resolution flattened copy.
+- Saving is a full PDF rewrite. It can invalidate digital signatures. Use Save As for signed or important originals. The app does not claim PDF/A, tagged-PDF, accessibility-tree, attachment, or complex interactive-feature preservation.
 - Notes remain editable PDF annotations. Text boxes are annotations; they do not modify underlying text.
 - Browser preview supports file selection and downloads for testing. Native filesystem and window features are desktop-only.
 - Recent document paths are stored locally in Electron's application data folder. PDF contents are not stored there. Validated workspace preferences are stored locally in the renderer’s localStorage.
@@ -93,7 +99,7 @@ This is not full Acrobat parity. Existing text/image editing, scanner capture, f
 
 `electron/main.ts` owns native dialogs and file access. The isolated preload exposes an explicit API, not Node, paths, or arbitrary IPC. File handles are opaque and originate from user file selection. Renderer IPC validates its sending window/frame. Permission requests, new windows, webviews, external navigation, and production HTTP requests are blocked.
 
-`src/core/worker.ts` runs MuPDF WebAssembly in a worker in the sandboxed renderer. A readiness handshake waits for WebAssembly initialization. PDF JavaScript is disabled. `src/core/history.ts` stores immutable command revisions. PDF.js renders canvas and a selectable text layer without the scripting viewer.
+`src/core/worker.ts` runs MuPDF WebAssembly in a worker in the sandboxed renderer. The worker keeps the active parsed document alive and keys it to the immutable revision ID. Sequential edits avoid reparsing or retransferring the input PDF; undo and branched history safely reload the exact stored revision. PDF JavaScript is disabled. `src/core/history.ts` stores immutable byte revisions. PDF.js renders canvas and a selectable text layer without the scripting viewer.
 
 Generated PDF.js resources are copied as bytes, avoiding macOS clonefile stalls observed in a cloud-managed Documents folder. `out/renderer` is the production renderer; `dist-electron` contains the main/preload bundles.
 

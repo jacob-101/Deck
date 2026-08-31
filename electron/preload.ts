@@ -6,6 +6,11 @@ const api: DesktopAPI = {
   openRecent: (id) => ipcRenderer.invoke("files:recent", id),
   openImages: () => ipcRenderer.invoke("files:open-images"),
   convertWord: () => ipcRenderer.invoke("files:convert-word"),
+  pickPDF: () => ipcRenderer.invoke("files:pick-pdf"),
+  convertPDFToDocx: (pages, name, mode) =>
+    ipcRenderer.invoke("files:convert-pdf-docx", pages, name, mode),
+  convertMarkup: (source, name, format) =>
+    ipcRenderer.invoke("files:convert-markup", source, name, format),
   recents: () => ipcRenderer.invoke("files:recents"),
   clearRecents: () => ipcRenderer.invoke("files:clear-recents"),
   save: (bytes, id, name, saveAs) =>

@@ -25,6 +25,7 @@ import {
   writeJSON,
   writeText,
 } from "./files";
+import { createDocx, markupToPDF } from "./conversions";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -188,6 +189,17 @@ function registerIPC() {
     });
     return result.canceled ? null : openPath(result.filePaths[0]);
   });
+  ipcMain.handle("files:pick-pdf", async (event) => {
+    trusted(event);
+    const result = await dialog.showOpenDialog(win, {
+      title: "Choose a PDF",
+      properties: ["openFile"],
+      filters: [{ name: "PDF documents", extensions: ["pdf"] }],
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    const { bytes } = await readPDF(result.filePaths[0]);
+    return { id: null, name: basename(result.filePaths[0]), bytes };
+  });
   ipcMain.handle("files:recents", (event) => {
     trusted(event);
     return recentFiles.map(({ id, name, date }) => ({ id, name, date }));
@@ -299,6 +311,58 @@ function registerIPC() {
       await rm(folder, { recursive: true, force: true });
     }
   });
+  ipcMain.handle(
+    "files:convert-pdf-docx",
+    async (event, pages: unknown, name: unknown, mode: unknown) => {
+      trusted(event);
+      if (
+        !Array.isArray(pages) ||
+        pages.length < 1 ||
+        pages.length > 100 ||
+        (mode !== "layout" && mode !== "editable")
+      )
+        throw new Error("Invalid DOCX conversion request.");
+      const result = await dialog.showSaveDialog(win, {
+        title: "Save Word document",
+        defaultPath: `${basename(typeof name === "string" ? name : "Document").replace(/\.pdf$/i, "")}.docx`,
+        filters: [{ name: "Word document", extensions: ["docx"] }],
+      });
+      if (result.canceled || !result.filePath) return false;
+      await createDocx(
+        pages as {
+          image?: Uint8Array;
+          text?: string;
+          width: number;
+          height: number;
+        }[],
+        result.filePath,
+        mode,
+      );
+      return true;
+    },
+  );
+  ipcMain.handle(
+    "files:convert-markup",
+    async (event, source: unknown, name: unknown, format: unknown) => {
+      trusted(event);
+      if (
+        typeof source !== "string" ||
+        typeof name !== "string" ||
+        (format !== "markdown" && format !== "latex")
+      )
+        throw new Error("Invalid text conversion request.");
+      const bytes = await markupToPDF(win, source, name, format);
+      validateBytes(bytes);
+      const result = await dialog.showSaveDialog(win, {
+        title: `Save ${format === "markdown" ? "Markdown" : "LaTeX"} PDF`,
+        defaultPath: `${basename(name).replace(/\.(md|markdown|tex)$/i, "") || "Document"}.pdf`,
+        filters: [{ name: "PDF document", extensions: ["pdf"] }],
+      });
+      if (result.canceled || !result.filePath) return null;
+      await atomicSave(result.filePath, bytes, null);
+      return openPath(result.filePath);
+    },
+  );
   ipcMain.handle(
     "files:save",
     async (
@@ -412,13 +476,36 @@ function registerIPC() {
       throw new Error("Invalid export.");
     let totalBytes = 0;
     for (const file of files) {
-      validateBytes(file.bytes);
+      if (
+        !file ||
+        typeof file.name !== "string" ||
+        !(file.bytes instanceof Uint8Array)
+      )
+        throw new Error("Invalid export file.");
+      if (/\.pdf$/i.test(file.name)) validateBytes(file.bytes);
+      else {
+        const png =
+          /\.png$/i.test(file.name) &&
+          file.bytes.length >= 8 &&
+          file.bytes[0] === 0x89 &&
+          file.bytes[1] === 0x50;
+        const jpeg =
+          /\.jpe?g$/i.test(file.name) &&
+          file.bytes.length >= 3 &&
+          file.bytes[0] === 0xff &&
+          file.bytes[1] === 0xd8 &&
+          file.bytes[2] === 0xff;
+        if (!png && !jpeg)
+          throw new Error(
+            "Only valid PDF, PNG and JPEG exports are supported.",
+          );
+      }
       totalBytes += file.bytes.length;
     }
     if (totalBytes > 100 * 1024 * 1024)
       throw new Error("Export is limited to 100 MB at a time.");
     const result = await dialog.showOpenDialog(win, {
-      title: "Choose a folder for extracted PDFs",
+      title: "Choose a folder for exported files",
       properties: ["openDirectory", "createDirectory"],
     });
     if (result.canceled) return false;
@@ -432,7 +519,7 @@ function registerIPC() {
         typeof file.name === "string"
           ? basename(file.name)
           : `Page ${index + 1}.pdf`;
-      await atomicSave(join(folder, name), file.bytes, null);
+      await atomicSave(join(folder, name), file.bytes, null, false);
     }
     return true;
   });

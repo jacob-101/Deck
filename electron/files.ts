@@ -40,8 +40,9 @@ export async function atomicSave(
   path: string,
   bytes: Uint8Array,
   expected?: string | null,
+  validatePDF = true,
 ) {
-  validateBytes(bytes);
+  if (validatePDF) validateBytes(bytes);
   if (expected !== undefined && (await stamp(path)) !== expected)
     throw new Error(
       "This file changed on disk. Use Save As to keep both versions.",

@@ -19,12 +19,36 @@ export type OCRResult = {
   processingTimeMs: number;
   engine: string;
 };
+export type PrivacyReport = {
+  metadata: { key: string; value: string }[];
+  embeddedFiles: string[];
+  formFields: number;
+  annotations: number;
+  externalLinks: number;
+  documentActions: string[];
+};
 export type DesktopAPI = {
   copyText(value: string): Promise<void>;
   open(): Promise<OpenFile | null>;
   openRecent(id: string): Promise<OpenFile>;
   openImages(): Promise<ImageFile[] | null>;
   convertWord(): Promise<(OpenFile & { engine: string }) | null>;
+  pickPDF(): Promise<OpenFile | null>;
+  convertPDFToDocx(
+    pages: {
+      image?: Uint8Array;
+      text?: string;
+      width: number;
+      height: number;
+    }[],
+    name: string,
+    mode: "layout" | "editable",
+  ): Promise<boolean>;
+  convertMarkup(
+    source: string,
+    name: string,
+    format: "markdown" | "latex",
+  ): Promise<OpenFile | null>;
   recents(): Promise<RecentFile[]>;
   clearRecents(): Promise<void>;
   save(
@@ -140,3 +164,32 @@ export type EditCommand =
       patch: AnnotationPatch;
     }
   | { type: "remove-annotation"; page: number; id: number };
+
+export type FormField = {
+  id: string;
+  page: number;
+  name: string;
+  label: string;
+  type: string;
+  value: string;
+  options: string[];
+  readOnly: boolean;
+};
+
+export type MetadataInput = {
+  title: string;
+  author: string;
+  subject: string;
+  keywords: string;
+  creator: string;
+};
+
+export type PDFToolResult = {
+  bytes: Uint8Array;
+  info: DocumentInfo;
+};
+
+export type ExportedFile = {
+  name: string;
+  bytes: Uint8Array;
+};

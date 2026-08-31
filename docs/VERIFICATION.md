@@ -14,9 +14,9 @@
 - Gstack browser verification at 980 × 650: sample PDF opened, rendered with selectable text, interactive controls present, no browser console errors. Version 0.2 Settings and welcome layouts also checked at the minimum size.
 - Visual inspection of welcome, reader, organizer, and minimum-window screenshots.
 
-Desktop scenarios: launch; sandbox/preload settings; worker initialization and real PDF rendering; document search and navigation; note placement; drawing and undo/redo; mouse-selected text highlighting; Add Text with custom font/size/color and interactive move; Sign workflow with typed signature, persistence opt-in, placement, and saved signature deletion; page rotate/duplicate/delete/reorder; native save and annotation persistence; extraction; split; merge; dark mode; canceled Save As; canceled close; recent-file reopen with annotations intact.
+Desktop scenarios: launch; sandbox/preload settings; worker initialization and real PDF rendering; enhanced Markdown publishing; unified PDF Tools metadata editing; exact-layout DOCX export; document search and navigation; note placement; drawing and undo/redo; mouse-selected text highlighting; Add Text with custom font/size/color and interactive move; Sign workflow with typed signature, persistence opt-in, placement, and saved signature deletion; page rotate/duplicate/delete/reorder; native save and annotation persistence; extraction; split; merge; dark mode; canceled Save As; canceled close; recent-file reopen with annotations intact.
 
-Filesystem tests check atomic replacement and refusal to overwrite an externally modified original. PDF tests include all nine annotation types, rotated-page annotation coordinates, independent page duplication, preserved notes during copy/merge, invalid ranges, protected-file rejection, and history save-state correctness.
+Filesystem tests check atomic replacement and refusal to overwrite an externally modified original. PDF tests include all nine annotation types, rotated-page annotation coordinates, independent page duplication, preserved notes during copy/merge, invalid ranges, password unlocking, standard form filling, metadata, Bates numbering, alternate mixing, mirroring, pages-per-sheet, embedded-image extraction, advanced splitting, both DOCX preparation modes, and history save-state correctness.
 
 The desktop harness supplies native dialog choices but calls the real preload, IPC, filesystem service, PDF worker, and renderer. It does not modify user documents. Evidence is generated in ignored `test-results/`; the harness is `scripts/test-desktop.mjs`.
 
@@ -29,6 +29,15 @@ The desktop harness supplies native dialog choices but calls the real preload, I
 - Clear recent history updates the native JSON file and renderer while preserving the actual PDF files.
 - Validation rejects unsupported preference values, tolerates damaged/unavailable storage, and migrates the original light/dark preference.
 - Final packaged-app run: 20 scenarios passed, zero renderer errors. Unit suite: 22 passed.
+
+## Version 0.4 tools and editing-engine checks
+
+- The worker keeps the current `PDFDocument` parsed in memory and keys it to the immutable revision ID. Consecutive edits reuse it; edits after undo or branch changes reload the exact revision bytes before mutation.
+- Advanced split supports fixed page groups, target file size, halves, top-level bookmark chapters, and section-start text.
+- Alternate/mix, pages-per-sheet, mirror, metadata, Bates numbering, image extraction, unlock, and AcroForm filling have direct engine regression coverage.
+- PDF-to-DOCX has an Exact Layout mode using 144-DPI page renders and an Editable Text mode using structured text and page breaks. Desktop QA verifies the generated DOCX package signature.
+- Markdown-to-PDF is exercised through the packaged native file service and reopened as a selectable PDF. LaTeX uses a restricted local MacTeX engine when present, with a bounded built-in offline fallback for common document commands.
+- Benchmark gap coverage includes structural compression, PNG/JPEG page rendering through 600 DPI, AES-256 encryption, annotation/form flattening, crop and A4/Letter resize, and local privacy inspection/cleanup. Native export validates file signatures before writing.
 
 ## Version 0.3 reader, text, and signing checks
 
@@ -43,7 +52,7 @@ The desktop harness supplies native dialog choices but calls the real preload, I
 
 ## Packaging
 
-`release/mac-arm64/OpenPDF Studio.app`, Electron 44.0.0, macOS arm64. Version 0.3.0. Local unsigned distribution. Tested with real Electron test suite (`25 passed, 0 errors`). No upload or public release performed.
+`release/mac-arm64/OpenPDF Studio.app`, Electron 44.0.0, macOS arm64. Version 0.4.0. Local unsigned distribution. Unit suite: `49 passed`. Packaged real-Electron suite: `33 passed, 0 renderer errors`. The packaged suite verifies high-quality PNG page export and the local privacy scan/clean flow. No public binary release performed.
 
 ## Not verified
 
