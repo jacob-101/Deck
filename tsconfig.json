@@ -13,5 +13,5 @@
     "noEmit": true,
     "types": ["vite/client", "node"]
   },
-  "include": ["src", "electron", "tests", "vite.config.ts"]
+  "include": ["src", "electron", "cli", "tests", "vite.config.ts"]
 }

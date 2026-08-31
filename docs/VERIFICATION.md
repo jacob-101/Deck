@@ -38,6 +38,7 @@ The desktop harness supplies native dialog choices but calls the real preload, I
 - PDF-to-DOCX has an Exact Layout mode using 144-DPI page renders and an Editable Text mode using structured text and page breaks. Desktop QA verifies the generated DOCX package signature.
 - Markdown-to-PDF is exercised through the packaged native file service and reopened as a selectable PDF. LaTeX uses a restricted local MacTeX engine when present, with a bounded built-in offline fallback for common document commands.
 - Benchmark gap coverage includes structural compression, PNG/JPEG page rendering through 600 DPI, AES-256 encryption, annotation/form flattening, crop and A4/Letter resize, and local privacy inspection/cleanup. Native export validates file signatures before writing.
+- The `openpdf` CLI exposes 23 offline commands through a machine-readable capability schema. Integration coverage invokes the built CLI as a separate Node process for inspection, text/Markdown extraction, atomic overwrite protection, encryption/unlocking, privacy scanning, and deterministic page rendering. Direct Apple Vision CLI OCR was also verified on a generated one-page PDF and produced Markdown with the recognized text.
 
 ## Version 0.3 reader, text, and signing checks
 
@@ -52,7 +53,7 @@ The desktop harness supplies native dialog choices but calls the real preload, I
 
 ## Packaging
 
-`release/mac-arm64/OpenPDF Studio.app`, Electron 44.0.0, macOS arm64. Version 0.4.0. Local unsigned distribution. Unit suite: `49 passed`. Packaged real-Electron suite: `33 passed, 0 renderer errors`. The packaged suite verifies high-quality PNG page export and the local privacy scan/clean flow. No public binary release performed.
+`release/mac-arm64/OpenPDF Studio.app`, Electron 44.0.0, macOS arm64. Version 0.4.0. Local unsigned distribution. Unit and integration suite: `54 passed`. Packaged real-Electron suite: `33 passed, 0 renderer errors`. The packaged suite verifies high-quality PNG page export and the local privacy scan/clean flow. No public binary release performed.
 
 ## Not verified
 

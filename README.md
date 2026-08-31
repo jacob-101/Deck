@@ -2,7 +2,7 @@
 
 A local PDF workspace for macOS. No accounts, no uploads, no telemetry.
 
-**Version 0.4:** a revision-aware editing engine, a unified local PDF Tools workspace, accurate-layout and editable PDF-to-DOCX export, and offline Markdown/LaTeX publishing. Includes the Forest & Paper identity and persistent Settings workspace.
+**Version 0.4:** a revision-aware editing engine, a unified local PDF Tools workspace, an agent-friendly offline CLI, accurate-layout and editable PDF-to-DOCX export, and offline Markdown/LaTeX publishing. Includes the Forest & Paper identity and persistent Settings workspace.
 
 ## Run
 
@@ -25,6 +25,15 @@ Create an unsigned macOS application:
 ```sh
 npm run package
 ```
+
+Build the offline CLI for scripts and AI agents:
+
+```sh
+npm run build:cli
+./bin/openpdf capabilities
+```
+
+See [docs/CLI.md](docs/CLI.md) for its JSON contract, commands, exit codes, secure password handling, and examples.
 
 The application is generated in `release/mac-arm64/OpenPDF Studio.app` on Apple Silicon (or `release/mac/` on Intel). This is a local early release, not an Apple-notarized public distribution. No signing credentials are required for local builds. No files are installed in /Applications automatically.
 

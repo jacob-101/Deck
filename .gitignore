@@ -3,6 +3,7 @@ public/pdfjs/
 dist/
 out/
 dist-electron/
+dist-cli/
 release/
 .gstack/
 .DS_Store
