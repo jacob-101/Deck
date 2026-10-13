@@ -211,6 +211,7 @@ export default function App() {
   const revision = state.revisions[state.cursor];
   const dirty = !!revision && revision.id !== state.saved;
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
+  const [pdfRevisionId, setPdfRevisionId] = useState("");
   const pdfTaskRef = useRef<PDFDocumentLoadingTask | null>(null);
   const [page, setPage] = useState(0);
   const [scaleMode, setScaleMode] = useState<"page" | "width" | "manual">(
@@ -405,6 +406,7 @@ export default function App() {
         const previous = pdfTaskRef.current;
         pdfTaskRef.current = loading;
         setPdf(document);
+        setPdfRevisionId(revision.id);
         // Let React hand the new document to PDFPage before releasing the old
         // one whose rendered pixels remain visible during the swap.
         if (previous) setTimeout(() => void previous.destroy(), 0);
@@ -578,8 +580,13 @@ export default function App() {
         setPage(count);
       } else await loadFile({ id: null, name: file.name, bytes });
     });
-  const applyEdit = (command: EditCommand, label: string, nextPage?: number) =>
-    void perform(label + "…", async () => {
+  const applyEdit = async (
+    command: EditCommand,
+    label: string,
+    nextPage?: number,
+  ) => {
+    let succeeded = false;
+    await perform(label + "…", async () => {
       if (!revision) return;
       const result = await pdfEngine.editSession(
         revision.bytes,
@@ -588,7 +595,10 @@ export default function App() {
       );
       state.commit(result.bytes, result.info, label, result.revisionId);
       if (nextPage !== undefined) setPage(nextPage);
+      succeeded = true;
     });
+    return succeeded;
+  };
   const saveAnnotation = async (patch: AnnotationPatch) => {
     const current = useDocument.getState();
     const entry = current.revisions[current.cursor];
@@ -672,7 +682,7 @@ export default function App() {
   const handleUpdateAnnotationRect = useCallback(
     (id: number, newRect: number[]) => {
       if (!revision) return;
-      applyEdit(
+      return applyEdit(
         {
           type: "update-annotation",
           page,
@@ -1765,6 +1775,9 @@ export default function App() {
                       pdf={pdf}
                       pageNumber={page + 1}
                       scale={scale}
+                      revisionId={revision.id}
+                      sourceRevisionId={pdfRevisionId}
+                      disabled={!!busy}
                       tool={busy ? "select" : tool}
                       color={color}
                       stroke={stroke}

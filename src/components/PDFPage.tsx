@@ -1,6 +1,7 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { TextLayer, type PDFDocumentProxy, type RenderTask } from "pdfjs-dist";
 import type { AnnotationInfo, AnnotationInput, Tool } from "../types";
+import { annotationPreview } from "../core/annotation-preview";
 
 export type PageProps = {
   pdf: PDFDocumentProxy;
@@ -13,13 +14,19 @@ export type PageProps = {
   annotations?: AnnotationInfo[];
   selectedAnnotationId?: number | null;
   onSelectAnnotation?: (id: number | null) => void;
-  onUpdateAnnotationRect?: (id: number, rect: number[]) => void;
+  onUpdateAnnotationRect?: (
+    id: number,
+    rect: number[],
+  ) => Promise<boolean> | void;
   onEditAnnotation?: (annotation: AnnotationInfo) => void;
-  onAnnotate?: (annotation: AnnotationInput) => void;
+  onAnnotate?: (annotation: AnnotationInput) => Promise<boolean> | void;
   onText?: (rect: number[], type: "Text" | "FreeText") => void;
   onStamp?: (rect: number[]) => void;
   onError?: (error: string) => void;
   thumbnail?: boolean;
+  disabled?: boolean;
+  revisionId?: string;
+  sourceRevisionId?: string;
 };
 
 export const rgb = (hex: string) =>
@@ -53,6 +60,9 @@ export const PDFPage = memo(function PDFPage({
   onStamp,
   onError,
   thumbnail = false,
+  disabled = false,
+  revisionId = "",
+  sourceRevisionId = "",
 }: PageProps) {
   const container = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
@@ -63,6 +73,8 @@ export const PDFPage = memo(function PDFPage({
   });
   const [visible, setVisible] = useState(!thumbnail);
   const [ready, setReady] = useState(false);
+  const [paintedRevisionId, setPaintedRevisionId] = useState("");
+  const current = !revisionId || paintedRevisionId === revisionId;
   const [draft, setDraft] = useState<number[][]>([]);
   const drawing = useRef<number[][] | null>(null);
   const pendingDraft = useRef<number[][] | null>(null);
@@ -71,11 +83,72 @@ export const PDFPage = memo(function PDFPage({
   const activeDragRef = useRef<DragState | null>(null);
   const dragFrame = useRef<number | null>(null);
   const interactionBounds = useRef<DOMRect | null>(null);
+  const previewCanvas = useRef<HTMLCanvasElement>(null);
+  const previewTasks = useRef(new Set<RenderTask>());
+  const dragGeneration = useRef(0);
+  const [artwork, setArtwork] = useState<HTMLCanvasElement | null>(null);
+  const originalCanvas = useRef<HTMLCanvasElement | null>(null);
+  const [pendingMark, setPendingMark] = useState<{
+    tool: Tool;
+    color: string;
+    stroke: number;
+    quads?: number[][];
+  } | null>(null);
+
+  const cancelDragPreview = () => {
+    dragGeneration.current++;
+    for (const task of previewTasks.current) task.cancel();
+    previewTasks.current.clear();
+    if (originalCanvas.current && canvas.current) {
+      const ctx = canvas.current.getContext("2d");
+      ctx?.clearRect(0, 0, canvas.current.width, canvas.current.height);
+      ctx?.drawImage(originalCanvas.current, 0, 0);
+    }
+    originalCanvas.current = null;
+    setArtwork(null);
+    setActiveDrag(null);
+  };
+  const prepareDragPreview = (annotation: AnnotationInfo) => {
+    const generation = ++dragGeneration.current;
+    const source = canvas.current;
+    if (!source) return;
+    void annotationPreview(
+      pdf,
+      pageNumber,
+      scale,
+      annotation,
+      source.width,
+      source.height,
+      previewTasks.current,
+    )
+      .then((result) => {
+        if (!result || generation !== dragGeneration.current || !canvas.current)
+          return;
+        const original = document.createElement("canvas");
+        original.width = source.width;
+        original.height = source.height;
+        original.getContext("2d")?.drawImage(source, 0, 0);
+        originalCanvas.current = original;
+        source.getContext("2d")?.drawImage(result.base, 0, 0);
+        setArtwork(result.artwork);
+      })
+      .catch(() => {
+        /* Keep the selection outline if an appearance cannot be isolated. */
+      });
+  };
+  useLayoutEffect(() => {
+    if (!artwork || !previewCanvas.current) return;
+    previewCanvas.current.width = artwork.width;
+    previewCanvas.current.height = artwork.height;
+    previewCanvas.current.getContext("2d")?.drawImage(artwork, 0, 0);
+  }, [artwork]);
 
   useEffect(
     () => () => {
       if (draftFrame.current !== null) cancelAnimationFrame(draftFrame.current);
       if (dragFrame.current !== null) cancelAnimationFrame(dragFrame.current);
+      dragGeneration.current++;
+      for (const task of previewTasks.current) task.cancel();
     },
     [],
   );
@@ -100,6 +173,15 @@ export const PDFPage = memo(function PDFPage({
     let cancelled = false;
     let render: RenderTask | undefined;
     let textLayer: TextLayer | undefined;
+    let cancelIdle: (() => void) | undefined;
+    const reportFailure = (error: { name?: string }) => {
+      if (
+        !cancelled &&
+        error?.name !== "RenderingCancelledException" &&
+        error?.name !== "AbortException"
+      )
+        onError?.("Could not render this page. Try reopening the document.");
+    };
     const firstRender = !canvas.current?.width;
     if (firstRender) setReady(false);
     const run = async () => {
@@ -128,7 +210,14 @@ export const PDFPage = memo(function PDFPage({
       visibleSurface.style.width = `${viewport.width}px`;
       visibleSurface.style.height = `${viewport.height}px`;
       visibleSurface.getContext("2d")?.drawImage(surface, 0, 0);
-      text.current.replaceChildren();
+      setPaintedRevisionId(sourceRevisionId);
+      // Swap persisted pixels and remove optimistic overlays in the same paint.
+      dragGeneration.current++;
+      originalCanvas.current = null;
+      setArtwork(null);
+      setActiveDrag(null);
+      setPendingMark(null);
+      setDraft([]);
       // Mark the page ready immediately so the canvas is visible without
       // waiting for the text layer. Selection and search load lazily below.
       if (!cancelled) setReady(true);
@@ -137,34 +226,43 @@ export const PDFPage = memo(function PDFPage({
         const capturedViewport = viewport;
         // requestIdleCallback (with setTimeout fallback) defers text layer
         // work to idle time so the visible canvas is never blocked by it.
-        const idleCb =
-          (window as Window & { requestIdleCallback?: (cb: () => void) => void })
-            .requestIdleCallback ?? ((cb: () => void) => setTimeout(cb, 0));
-        idleCb(async () => {
-          if (cancelled || !textContainer) return;
+        const renderText = async () => {
+          if (cancelled) return;
+          const content = await page.getTextContent();
+          if (cancelled) return;
+          const staging = document.createElement("div");
+          staging.className = "textLayer";
           textLayer = new TextLayer({
-            textContentSource: await page.getTextContent(),
-            container: textContainer,
+            textContentSource: content,
+            container: staging,
             viewport: capturedViewport,
           });
           await textLayer.render();
-        });
+          if (!cancelled) {
+            textContainer.style.cssText = staging.style.cssText;
+            textContainer.replaceChildren(...staging.childNodes);
+          }
+        };
+        const callback = () => {
+          void renderText().catch(reportFailure);
+        };
+        if (window.requestIdleCallback) {
+          const id = window.requestIdleCallback(callback, { timeout: 250 });
+          cancelIdle = () => window.cancelIdleCallback(id);
+        } else {
+          const id = window.setTimeout(callback, 0);
+          cancelIdle = () => window.clearTimeout(id);
+        }
       }
     };
-    void run().catch((error) => {
-      if (
-        !cancelled &&
-        error?.name !== "RenderingCancelledException" &&
-        error?.name !== "AbortException"
-      )
-        onError?.("Could not render this page. Try reopening the document.");
-    });
+    void run().catch(reportFailure);
     return () => {
       cancelled = true;
+      cancelIdle?.();
       render?.cancel();
       textLayer?.cancel();
     };
-  }, [pdf, pageNumber, scale, visible, thumbnail, onError]);
+  }, [pdf, pageNumber, scale, visible, thumbnail, onError, sourceRevisionId]);
 
   // Search changes should only update existing text-layer spans. Re-rendering
   // the PDF canvas for every search keystroke is expensive and can cause
@@ -204,10 +302,13 @@ export const PDFPage = memo(function PDFPage({
 
   const markup =
     tool === "Highlight" || tool === "Underline" || tool === "StrikeOut";
-  const drawMode = tool !== "select" && !markup;
+  const previewTool = pendingMark?.tool ?? tool;
+  const previewColor = pendingMark?.color ?? color;
+  const previewStroke = pendingMark?.stroke ?? stroke;
+  const drawMode = !!pendingMark || (tool !== "select" && !markup);
 
   const selectionEnd = () => {
-    if (!markup || !ready) return;
+    if (disabled || !current || !markup || !ready || pendingMark) return;
     const selection = window.getSelection();
     if (
       !selection?.rangeCount ||
@@ -236,13 +337,18 @@ export const PDFPage = memo(function PDFPage({
       (rect.bottom - base.top) / scale,
     ]);
     const first = quads[0];
-    onAnnotate?.({
-      type: tool,
-      rect: [first[0], first[1], first[6], first[7]],
-      quads,
-      color: rgb(color),
-      width: stroke,
-      contents: selection.toString(),
+    setPendingMark({ tool, color, stroke, quads });
+    void Promise.resolve(
+      onAnnotate?.({
+        type: tool,
+        rect: [first[0], first[1], first[6], first[7]],
+        quads,
+        color: rgb(color),
+        width: stroke,
+        contents: selection.toString(),
+      }),
+    ).then((success) => {
+      if (success === false) setPendingMark(null);
     });
     selection.removeAllRanges();
   };
@@ -257,7 +363,6 @@ export const PDFPage = memo(function PDFPage({
       cancelAnimationFrame(draftFrame.current);
       draftFrame.current = null;
     }
-    setDraft([]);
     const end = point(event);
     const start = points[0];
     const rect = [
@@ -270,6 +375,7 @@ export const PDFPage = memo(function PDFPage({
     const pageHeight = size.height / scale;
 
     if (tool === "Text" || tool === "FreeText") {
+      setDraft([]);
       if (tool === "Text") {
         onText?.(
           [
@@ -305,6 +411,7 @@ export const PDFPage = memo(function PDFPage({
     }
 
     if (tool === "Stamp") {
+      setDraft([]);
       const isDrag =
         Math.abs(end[0] - start[0]) > 15 && Math.abs(end[1] - start[1]) > 15;
       if (isDrag) {
@@ -330,26 +437,48 @@ export const PDFPage = memo(function PDFPage({
       (Math.abs(end[0] - start[0]) < 2 &&
         Math.abs(end[1] - start[1]) < 2 &&
         tool !== "Ink")
-    )
+    ) {
+      setDraft([]);
       return;
-    if (tool === "Ink" && points.length < 2) return;
-    onAnnotate?.({
-      type: tool,
-      rect,
-      points: tool === "Ink" ? [...points, end] : [start, end],
-      color: rgb(color),
-      width: stroke,
+    }
+    if (tool === "Ink" && points.length < 2) {
+      setDraft([]);
+      return;
+    }
+    setDraft([...points, end]);
+    setPendingMark({ tool, color, stroke });
+    void Promise.resolve(
+      onAnnotate?.({
+        type: tool,
+        rect,
+        points: tool === "Ink" ? [...points, end] : [start, end],
+        color: rgb(color),
+        width: stroke,
+      }),
+    ).then((success) => {
+      if (success === false) {
+        setPendingMark(null);
+        setDraft([]);
+      }
     });
   };
 
   // Drag & Resize Handlers
   const handleStartMove = (annot: AnnotationInfo, e: React.PointerEvent) => {
-    if (tool !== "select" || annot.locked || !annot.editable) return;
+    if (
+      disabled ||
+      !current ||
+      activeDrag ||
+      e.button !== 0 ||
+      tool !== "select" ||
+      annot.locked ||
+      !annot.editable
+    )
+      return;
     e.stopPropagation();
-    interactionBounds.current = container.current?.getBoundingClientRect() ?? null;
-    container.current
-      ?.querySelector<HTMLElement>(".annotation-interaction-layer")
-      ?.setPointerCapture(e.pointerId);
+    interactionBounds.current =
+      container.current?.getBoundingClientRect() ?? null;
+    e.currentTarget.setPointerCapture(e.pointerId);
     onSelectAnnotation?.(annot.id);
     const p = point(e);
     const rect = annot.rect || [0, 0, 0, 0];
@@ -375,6 +504,7 @@ export const PDFPage = memo(function PDFPage({
     };
     activeDragRef.current = drag;
     setActiveDrag(drag);
+    prepareDragPreview(annot);
   };
 
   const handleStartResize = (
@@ -382,11 +512,19 @@ export const PDFPage = memo(function PDFPage({
     annot: AnnotationInfo,
     e: React.PointerEvent,
   ) => {
+    if (
+      disabled ||
+      !current ||
+      activeDragRef.current ||
+      e.button !== 0 ||
+      annot.locked ||
+      !annot.editable
+    )
+      return;
     e.stopPropagation();
-    interactionBounds.current = container.current?.getBoundingClientRect() ?? null;
-    container.current
-      ?.querySelector<HTMLElement>(".annotation-interaction-layer")
-      ?.setPointerCapture(e.pointerId);
+    interactionBounds.current =
+      container.current?.getBoundingClientRect() ?? null;
+    e.currentTarget.setPointerCapture(e.pointerId);
     const p = point(e);
     const rect = annot.rect || [0, 0, 0, 0];
     const originalRect: [number, number, number, number] = [
@@ -411,6 +549,7 @@ export const PDFPage = memo(function PDFPage({
     };
     activeDragRef.current = drag;
     setActiveDrag(drag);
+    prepareDragPreview(annot);
   };
 
   const handleDragMove = (e: React.PointerEvent) => {
@@ -484,7 +623,8 @@ export const PDFPage = memo(function PDFPage({
     });
   };
 
-  const handleDragEnd = () => {
+  const handleDragEnd = (event: React.PointerEvent) => {
+    handleDragMove(event);
     const drag = activeDragRef.current;
     if (!drag) return;
     if (dragFrame.current !== null) {
@@ -501,18 +641,15 @@ export const PDFPage = memo(function PDFPage({
       Math.abs(currentRect[2] - originalRect[2]) > 0.5 ||
       Math.abs(currentRect[3] - originalRect[3]) > 0.5;
 
-    // Batch the final state reset into the next frame so pointer-event
-    // processing completes before React re-renders.
-    requestAnimationFrame(() => {
-      setActiveDrag(null);
-      if (changed) {
-        onUpdateAnnotationRect?.(id, [
-          Math.round(currentRect[0]),
-          Math.round(currentRect[1]),
-          Math.round(currentRect[2]),
-          Math.round(currentRect[3]),
-        ]);
-      }
+    if (!changed) {
+      cancelDragPreview();
+      return;
+    }
+    setActiveDrag({ ...drag });
+    void Promise.resolve(
+      onUpdateAnnotationRect?.(id, currentRect.map(Math.round)),
+    ).then((success) => {
+      if (success === false) cancelDragPreview();
     });
   };
 
@@ -530,7 +667,7 @@ export const PDFPage = memo(function PDFPage({
           "--scale-factor": scale,
         } as React.CSSProperties
       }
-      data-ready={ready}
+      data-ready={ready && current}
       onMouseUp={selectionEnd}
       onClick={(e) => {
         if (e.target === container.current || e.target === canvas.current) {
@@ -546,6 +683,24 @@ export const PDFPage = memo(function PDFPage({
         </div>
       )}
 
+      {activeDrag && artwork && (
+        <canvas
+          ref={previewCanvas}
+          className="annotation-drag-preview"
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            pointerEvents: "none",
+            zIndex: 9,
+            left: activeDrag.currentRect[0] * scale,
+            top: activeDrag.currentRect[1] * scale,
+            width:
+              (activeDrag.currentRect[2] - activeDrag.currentRect[0]) * scale,
+            height:
+              (activeDrag.currentRect[3] - activeDrag.currentRect[1]) * scale,
+          }}
+        />
+      )}
       {/* Interactive Selection and Hit Targets in Select Mode */}
       {!thumbnail && ready && tool === "select" && (
         <div
@@ -564,7 +719,7 @@ export const PDFPage = memo(function PDFPage({
               cancelAnimationFrame(dragFrame.current);
               dragFrame.current = null;
             }
-            setActiveDrag(null);
+            cancelDragPreview();
           }}
         >
           {annotations
@@ -614,7 +769,7 @@ export const PDFPage = memo(function PDFPage({
                   onPointerDown={(e) => handleStartMove(ann, e)}
                   onDoubleClick={(e) => {
                     e.stopPropagation();
-                    onEditAnnotation?.(ann);
+                    if (!disabled && current) onEditAnnotation?.(ann);
                   }}
                 >
                   {/* Resize Handles when selected */}
@@ -673,15 +828,17 @@ export const PDFPage = memo(function PDFPage({
           className="draw-layer"
           viewBox={`0 0 ${size.width / scale} ${size.height / scale}`}
           onPointerDown={(event) => {
-            if (event.button !== 0) return;
+            if (disabled || !current || event.button !== 0 || pendingMark)
+              return;
             event.currentTarget.setPointerCapture(event.pointerId);
-            interactionBounds.current = container.current?.getBoundingClientRect() ?? null;
+            interactionBounds.current =
+              container.current?.getBoundingClientRect() ?? null;
             const p = point(event);
             drawing.current = [p];
             setDraft([p]);
           }}
           onPointerMove={(event) => {
-            if (!drawing.current) return;
+            if (!drawing.current || pendingMark) return;
             const points = drawing.current;
             if (tool === "Ink") {
               // Only record a new point when it's moved at least 1.5 px from
@@ -711,35 +868,55 @@ export const PDFPage = memo(function PDFPage({
             setDraft([]);
           }}
         >
+          {pendingMark?.quads?.map((q, index) =>
+            pendingMark.tool === "Highlight" ? (
+              <polygon
+                key={index}
+                points={`${q[0]},${q[1]} ${q[2]},${q[3]} ${q[6]},${q[7]} ${q[4]},${q[5]}`}
+                fill={pendingMark.color}
+                fillOpacity={0.35}
+              />
+            ) : (
+              <line
+                key={index}
+                x1={q[4]}
+                x2={q[6]}
+                y1={pendingMark.tool === "Underline" ? q[5] : (q[1] + q[5]) / 2}
+                y2={pendingMark.tool === "Underline" ? q[7] : (q[3] + q[7]) / 2}
+                stroke={pendingMark.color}
+                strokeWidth={1}
+              />
+            ),
+          )}
           {a &&
             b &&
-            (tool === "Ink" ? (
+            (previewTool === "Ink" ? (
               <polyline
                 points={draft.map((p) => p.join(",")).join(" ")}
                 fill="none"
-                stroke={color}
-                strokeWidth={stroke}
+                stroke={previewColor}
+                strokeWidth={previewStroke}
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
-            ) : tool === "Circle" ? (
+            ) : previewTool === "Circle" ? (
               <ellipse
                 cx={(a[0] + b[0]) / 2}
                 cy={(a[1] + b[1]) / 2}
                 rx={Math.abs(b[0] - a[0]) / 2}
                 ry={Math.abs(b[1] - a[1]) / 2}
                 fill="none"
-                stroke={color}
-                strokeWidth={stroke}
+                stroke={previewColor}
+                strokeWidth={previewStroke}
               />
-            ) : tool === "Line" ? (
+            ) : previewTool === "Line" ? (
               <line
                 x1={a[0]}
                 y1={a[1]}
                 x2={b[0]}
                 y2={b[1]}
-                stroke={color}
-                strokeWidth={stroke}
+                stroke={previewColor}
+                strokeWidth={previewStroke}
               />
             ) : (
               <rect
@@ -747,10 +924,12 @@ export const PDFPage = memo(function PDFPage({
                 y={Math.min(a[1], b[1])}
                 width={Math.abs(b[0] - a[0])}
                 height={Math.abs(b[1] - a[1])}
-                fill={tool === "Stamp" ? "rgba(54, 90, 71, 0.08)" : "none"}
-                strokeDasharray={tool === "Stamp" ? "4 4" : undefined}
-                stroke={tool === "Stamp" ? "#365a47" : color}
-                strokeWidth={tool === "Stamp" ? 1.5 : stroke}
+                fill={
+                  previewTool === "Stamp" ? "rgba(54, 90, 71, 0.08)" : "none"
+                }
+                strokeDasharray={previewTool === "Stamp" ? "4 4" : undefined}
+                stroke={previewTool === "Stamp" ? "#365a47" : previewColor}
+                strokeWidth={previewTool === "Stamp" ? 1.5 : previewStroke}
               />
             ))}
         </svg>

@@ -32,6 +32,7 @@ export function AnnotationEditor({
   // Uncontrolled textarea — read via ref only at submit time, eliminating
   // a full React render cycle on every keystroke.
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const previewRef = useRef<HTMLOutputElement>(null);
   const originalColor = annotationHex(annotation.color);
   const [color, setColor] = useState(originalColor);
   const [width, setWidth] = useState(String(annotation.width ?? 2));
@@ -179,7 +180,12 @@ export function AnnotationEditor({
             autoFocus
             rows={4}
             defaultValue={annotation.contents}
-            onChange={() => setIsDirty(true)}
+            onChange={(event) => {
+              setIsDirty(event.target.value !== annotation.contents);
+              if (previewRef.current)
+                previewRef.current.textContent = event.target.value;
+              setError("");
+            }}
             maxLength={5000}
             placeholder={
               textAnnotation ? "Your text…" : "Add a comment to this mark…"
@@ -344,6 +350,40 @@ export function AnnotationEditor({
                   ? "Transparent — the page shows through."
                   : "The fill is saved inside the PDF."}
               </small>
+            </div>
+          )}
+          {textAnnotation && (
+            <div style={{ marginTop: 16 }}>
+              <small>Live preview</small>
+              <output
+                ref={previewRef}
+                aria-label="Annotation preview"
+                style={{
+                  display: "block",
+                  whiteSpace: "pre-wrap",
+                  overflowWrap: "anywhere",
+                  maxHeight: 150,
+                  overflow: "auto",
+                  padding: 12,
+                  marginTop: 6,
+                  color,
+                  background:
+                    fillColor === "none" ? "var(--surface)" : fillColor,
+                  fontSize: isFreeText
+                    ? Math.max(6, Math.min(144, Number(fontSize) || 14))
+                    : 14,
+                  fontFamily:
+                    font === "Cour"
+                      ? "monospace"
+                      : font === "Times"
+                        ? "serif"
+                        : "Helvetica, Arial, sans-serif",
+                  border: "1px solid var(--line)",
+                  borderRadius: 6,
+                }}
+              >
+                {annotation.contents}
+              </output>
             </div>
           )}
         </fieldset>
