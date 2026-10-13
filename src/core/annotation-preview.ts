@@ -63,18 +63,34 @@ export async function annotationPreview(
   if (!ranges.length) return null;
   const inside = (index: number) =>
     ranges.some(([start, end]) => index >= start && index <= end);
-  const base = document.createElement("canvas");
-  base.width = width;
-  base.height = height;
-  const artwork = document.createElement("canvas");
   const sx = width / viewport.width,
     sy = height / viewport.height;
-  artwork.width = Math.max(1, Math.ceil((rect[2] - rect[0]) * sx));
-  artwork.height = Math.max(1, Math.ceil((rect[3] - rect[1]) * sy));
+  const artworkWidth = Math.ceil((rect[2] - rect[0]) * sx);
+  const artworkHeight = Math.ceil((rect[3] - rect[1]) * sy);
+  if (
+    artworkWidth < 1 ||
+    artworkHeight < 1 ||
+    artworkWidth > width ||
+    artworkHeight > height
+  )
+    return null;
+  // Only repaint the rectangle exposed by the moved annotation. The rest of
+  // the page is already correct on the visible canvas and is never copied.
+  const x = Math.max(0, Math.floor(rect[0] * sx) - 4);
+  const y = Math.max(0, Math.floor(rect[1] * sy) - 4);
+  const right = Math.min(width, Math.ceil(rect[2] * sx) + 4);
+  const bottom = Math.min(height, Math.ceil(rect[3] * sy) + 4);
+  if (right <= x || bottom <= y) return null;
+  const base = document.createElement("canvas");
+  base.width = right - x;
+  base.height = bottom - y;
+  const artwork = document.createElement("canvas");
+  artwork.width = artworkWidth;
+  artwork.height = artworkHeight;
   const baseTask = page.render({
     canvas: base,
     viewport,
-    transform: [sx, 0, 0, sy, 0, 0],
+    transform: [sx, 0, 0, sy, -x, -y],
     operationsFilter: (index) => !inside(index),
   });
   const artworkTask = page.render({
@@ -93,5 +109,5 @@ export async function annotationPreview(
     tasks.delete(baseTask);
     tasks.delete(artworkTask);
   }
-  return { base, artwork };
+  return { base, artwork, x, y };
 }

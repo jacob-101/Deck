@@ -67,6 +67,7 @@ export const PDFPage = memo(function PDFPage({
   const container = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const text = useRef<HTMLDivElement>(null);
+  const textSignature = useRef("");
   const [size, setSize] = useState({
     width: 612 * scale,
     height: 792 * scale,
@@ -87,7 +88,27 @@ export const PDFPage = memo(function PDFPage({
   const previewTasks = useRef(new Set<RenderTask>());
   const dragGeneration = useRef(0);
   const [artwork, setArtwork] = useState<HTMLCanvasElement | null>(null);
-  const originalCanvas = useRef<HTMLCanvasElement | null>(null);
+  const originalCanvas = useRef<{
+    canvas: HTMLCanvasElement;
+    x: number;
+    y: number;
+  } | null>(null);
+  const dragHit = useRef<HTMLElement | null>(null);
+  const dragOrigin = useRef<number[] | null>(null);
+  const preparedPreview = useRef<{
+    pdf: PDFDocumentProxy;
+    id: number;
+    width: number;
+    height: number;
+    result: Awaited<ReturnType<typeof annotationPreview>>;
+  } | null>(null);
+  const positionPreview = (element: HTMLElement | null, rect: number[]) => {
+    if (!element) return;
+    element.style.left = `${rect[0] * scale}px`;
+    element.style.top = `${rect[1] * scale}px`;
+    element.style.width = `${Math.max(12, (rect[2] - rect[0]) * scale)}px`;
+    element.style.height = `${Math.max(12, (rect[3] - rect[1]) * scale)}px`;
+  };
   const [pendingMark, setPendingMark] = useState<{
     tool: Tool;
     color: string;
@@ -101,10 +122,14 @@ export const PDFPage = memo(function PDFPage({
     previewTasks.current.clear();
     if (originalCanvas.current && canvas.current) {
       const ctx = canvas.current.getContext("2d");
-      ctx?.clearRect(0, 0, canvas.current.width, canvas.current.height);
-      ctx?.drawImage(originalCanvas.current, 0, 0);
+      const saved = originalCanvas.current;
+      ctx?.clearRect(saved.x, saved.y, saved.canvas.width, saved.canvas.height);
+      ctx?.drawImage(saved.canvas, saved.x, saved.y);
     }
     originalCanvas.current = null;
+    if (dragOrigin.current)
+      positionPreview(dragHit.current, dragOrigin.current);
+    dragHit.current = null;
     setArtwork(null);
     setActiveDrag(null);
   };
@@ -112,24 +137,52 @@ export const PDFPage = memo(function PDFPage({
     const generation = ++dragGeneration.current;
     const source = canvas.current;
     if (!source) return;
-    void annotationPreview(
-      pdf,
-      pageNumber,
-      scale,
-      annotation,
-      source.width,
-      source.height,
-      previewTasks.current,
-    )
+    const cached = preparedPreview.current;
+    const request =
+      cached?.pdf === pdf &&
+      cached.id === annotation.id &&
+      cached.width === source.width &&
+      cached.height === source.height
+        ? Promise.resolve(cached.result)
+        : annotationPreview(
+            pdf,
+            pageNumber,
+            scale,
+            annotation,
+            source.width,
+            source.height,
+            previewTasks.current,
+          );
+    void request
       .then((result) => {
         if (!result || generation !== dragGeneration.current || !canvas.current)
           return;
+        preparedPreview.current = {
+          pdf,
+          id: annotation.id,
+          width: source.width,
+          height: source.height,
+          result,
+        };
         const original = document.createElement("canvas");
-        original.width = source.width;
-        original.height = source.height;
-        original.getContext("2d")?.drawImage(source, 0, 0);
-        originalCanvas.current = original;
-        source.getContext("2d")?.drawImage(result.base, 0, 0);
+        original.width = result.base.width;
+        original.height = result.base.height;
+        original
+          .getContext("2d")
+          ?.drawImage(
+            source,
+            result.x,
+            result.y,
+            original.width,
+            original.height,
+            0,
+            0,
+            original.width,
+            original.height,
+          );
+        originalCanvas.current = { canvas: original, x: result.x, y: result.y };
+        source.getContext("2d")?.drawImage(result.base, result.x, result.y);
+        if (activeDragRef.current) setActiveDrag({ ...activeDragRef.current });
         setArtwork(result.artwork);
       })
       .catch(() => {
@@ -214,6 +267,8 @@ export const PDFPage = memo(function PDFPage({
       // Swap persisted pixels and remove optimistic overlays in the same paint.
       dragGeneration.current++;
       originalCanvas.current = null;
+      preparedPreview.current = null;
+      dragHit.current = null;
       setArtwork(null);
       setActiveDrag(null);
       setPendingMark(null);
@@ -230,6 +285,27 @@ export const PDFPage = memo(function PDFPage({
           if (cancelled) return;
           const content = await page.getTextContent();
           if (cancelled) return;
+          // Annotation-only revisions keep the page text and geometry intact.
+          // PDF.js assigns new font IDs to every proxy, so compare the actual
+          // font styles rather than those transient IDs. Keeping the spans
+          // avoids both repeated layout and losing an in-progress selection.
+          const signature = JSON.stringify([
+            capturedViewport.transform,
+            content.items.map((item) =>
+              "str" in item
+                ? [
+                    item.str,
+                    item.dir,
+                    item.transform,
+                    item.width,
+                    item.height,
+                    item.hasEOL,
+                    content.styles[item.fontName],
+                  ]
+                : item,
+            ),
+          ]);
+          if (signature === textSignature.current) return;
           const staging = document.createElement("div");
           staging.className = "textLayer";
           textLayer = new TextLayer({
@@ -239,6 +315,7 @@ export const PDFPage = memo(function PDFPage({
           });
           await textLayer.render();
           if (!cancelled) {
+            textSignature.current = signature;
             textContainer.style.cssText = staging.style.cssText;
             textContainer.replaceChildren(...staging.childNodes);
           }
@@ -464,7 +541,10 @@ export const PDFPage = memo(function PDFPage({
   };
 
   // Drag & Resize Handlers
-  const handleStartMove = (annot: AnnotationInfo, e: React.PointerEvent) => {
+  const handleStartMove = (
+    annot: AnnotationInfo,
+    e: React.PointerEvent<HTMLDivElement>,
+  ) => {
     if (
       disabled ||
       !current ||
@@ -503,6 +583,9 @@ export const PDFPage = memo(function PDFPage({
       isStamp,
     };
     activeDragRef.current = drag;
+    dragOrigin.current = originalRect;
+    dragHit.current =
+      drag.type === "move" ? e.currentTarget : e.currentTarget.parentElement;
     setActiveDrag(drag);
     prepareDragPreview(annot);
   };
@@ -510,7 +593,7 @@ export const PDFPage = memo(function PDFPage({
   const handleStartResize = (
     handleType: "nw" | "ne" | "se" | "sw",
     annot: AnnotationInfo,
-    e: React.PointerEvent,
+    e: React.PointerEvent<HTMLDivElement>,
   ) => {
     if (
       disabled ||
@@ -548,6 +631,9 @@ export const PDFPage = memo(function PDFPage({
       isStamp,
     };
     activeDragRef.current = drag;
+    dragOrigin.current = originalRect;
+    dragHit.current =
+      drag.type === "move" ? e.currentTarget : e.currentTarget.parentElement;
     setActiveDrag(drag);
     prepareDragPreview(annot);
   };
@@ -619,7 +705,10 @@ export const PDFPage = memo(function PDFPage({
     dragFrame.current = requestAnimationFrame(() => {
       dragFrame.current = null;
       const latest = activeDragRef.current;
-      if (latest) setActiveDrag({ ...latest });
+      if (latest) {
+        positionPreview(dragHit.current, latest.currentRect);
+        positionPreview(previewCanvas.current, latest.currentRect);
+      }
     });
   };
 

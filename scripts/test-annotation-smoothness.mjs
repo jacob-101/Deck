@@ -7,7 +7,9 @@ const temp = await mkdtemp(join(tmpdir(), "openpdf-annotation-"));
 const output = resolve("test-results/annotation-smoothness");
 await mkdir(output, { recursive: true });
 const app = await electron.launch({
-  args: ["."],
+  ...(process.env.OPENPDF_TEST_EXECUTABLE
+    ? { executablePath: process.env.OPENPDF_TEST_EXECUTABLE }
+    : { args: ["."] }),
   env: { ...process.env, OPENPDF_TEST_USER_DATA: join(temp, "profile") },
 });
 const child = app.process();
