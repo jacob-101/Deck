@@ -156,14 +156,14 @@ button {
   background: var(--bg);
 }
 .titlebar {
-  height: 62px;
-  min-height: 62px;
+  height: 56px;
+  min-height: 56px;
   display: flex;
   align-items: center;
-  padding: 0 21px 0 96px;
+  padding: 0 16px 0 96px;
   border-bottom: 1px solid var(--line);
   -webkit-app-region: drag;
-  gap: 24px;
+  gap: 20px;
   background: var(--panel);
   user-select: none;
 }
@@ -174,6 +174,112 @@ button {
   white-space: nowrap;
   font-size: 14px;
   letter-spacing: -0.3px;
+}
+.document-tabs {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  align-items: center;
+  gap: 6px;
+  -webkit-app-region: drag;
+}
+.document-tab-list {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-app-region: no-drag;
+}
+.document-tab-list::-webkit-scrollbar {
+  display: none;
+}
+.document-tab {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  max-width: 240px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--muted);
+}
+.document-tab:not(.active):hover {
+  background: var(--soft);
+  color: var(--text);
+}
+.document-tab.active {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--line);
+  box-shadow: 0 1px 3px #14261b08;
+}
+.document-tab-select {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 10px;
+  height: 32px;
+  color: inherit;
+  border: 0;
+  background: transparent;
+  font-size: 12px;
+}
+.document-tab.active .document-tab-select svg {
+  color: var(--green);
+}
+.document-tab-select > span:not(.dirty-dot) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.document-tab-select svg,
+.document-tab-select .dirty-dot {
+  flex-shrink: 0;
+}
+.document-tab-close,
+.document-tab-new {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.document-tab-close {
+  width: 22px;
+  height: 22px;
+  margin-right: 5px;
+}
+.document-tab-new {
+  width: 28px;
+  height: 28px;
+}
+.document-tab-close:hover,
+.document-tab-new:hover {
+  color: var(--text);
+  background: var(--green-soft);
+}
+.document-tab-select:focus-visible,
+.document-tab-close:focus-visible,
+.document-tab-new:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: -3px;
+}
+.title-brand {
+  flex-shrink: 0;
+}
+.title-actions {
+  flex-shrink: 0;
+}
+.titlebar .title-actions {
+  gap: 2px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
 }
 .title-brand b {
   font-weight: 400;
@@ -301,8 +407,8 @@ button {
   align-items: center;
   justify-content: space-between;
   padding: 0 20px;
-  height: 63px;
-  min-height: 63px;
+  height: 48px;
+  min-height: 48px;
   background: var(--panel);
   border-bottom: 1px solid var(--line);
 }
@@ -318,8 +424,8 @@ button {
 .mode-switch {
   display: flex;
   background: var(--soft);
-  padding: 4px;
-  border-radius: 8px;
+  padding: 3px;
+  border-radius: 7px;
   border: 1px solid var(--line);
   gap: 2px;
 }
@@ -334,12 +440,12 @@ button {
 }
 .mode-switch button.selected {
   background: var(--surface);
-  color: var(--text);
-  box-shadow: 0 1px 4px #00000012;
+  color: var(--green);
+  box-shadow: 0 1px 3px #0000000d;
 }
 .context-toolbar {
-  height: 49px;
-  min-height: 49px;
+  height: 46px;
+  min-height: 46px;
   display: flex;
   align-items: center;
   padding: 0 23px;
@@ -367,7 +473,24 @@ button {
 }
 .annotation-tools {
   display: flex;
-  gap: 3px;
+  align-items: center;
+  gap: 8px;
+}
+.annotation-tool-group {
+  display: flex;
+  gap: 2px;
+}
+.annotation-tool-group + .annotation-tool-group {
+  border-left: 1px solid var(--line);
+  padding-left: 8px;
+}
+.annotation-tools .icon-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+}
+.annotation-tools .icon-button.active {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--green) 20%, transparent);
 }
 .swatches {
   display: flex;
@@ -2280,10 +2403,10 @@ button {
     min-width: 190px;
   }
   .context-hint {
-    font-size: 10px;
+    display: none;
   }
   .annotation-tools {
-    gap: 0;
+    gap: 6px;
   }
   .context-toolbar {
     padding: 0 14px;

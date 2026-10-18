@@ -1,3 +1,4 @@
+import pptxgen from "pptxgenjs";
 import { BrowserWindow } from "electron";
 import {
   access,
@@ -308,4 +309,73 @@ export async function markupToPDF(
   const body =
     format === "markdown" ? markdownHTML(source) : latexFallbackHTML(source);
   return printHTML(parent, pageHTML(body, name));
+}
+
+export async function createPptx(
+  pages: { image?: Uint8Array; width: number; height: number }[],
+  output: string,
+) {
+  if (!Array.isArray(pages) || !pages.length || pages.length > 100)
+    throw new Error("PPTX conversion supports 1–100 pages.");
+  let total = 0;
+  for (const page of pages) {
+    if (
+      !page ||
+      !Number.isFinite(page.width) ||
+      !Number.isFinite(page.height) ||
+      page.width < 1 ||
+      page.height < 1 ||
+      page.width > 20000 ||
+      page.height > 20000
+    )
+      throw new Error("A PPTX page has invalid dimensions.");
+    if (
+      !(page.image instanceof Uint8Array) ||
+      page.image.length > 30 * 1024 * 1024 ||
+      !Buffer.from(page.image.subarray(0, 8)).equals(
+        Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+      )
+    )
+      throw new Error("A rendered page image is invalid.");
+    total += page.image.length;
+  }
+  if (total > 250 * 1024 * 1024)
+    throw new Error("The PPTX export exceeds the 250 MB conversion limit.");
+  const deck = new pptxgen();
+  // Keep slide dimensions within PowerPoint's supported range, preserving aspect ratio.
+  const scale = Math.min(
+    1 / 72,
+    56 / Math.max(pages[0].width, pages[0].height),
+  );
+  const width = pages[0].width * scale;
+  const height = pages[0].height * scale;
+  deck.defineLayout({ name: "PDF", width, height });
+  deck.layout = "PDF";
+  deck.author = "OpenPDF Studio";
+  deck.subject = "PDF pages preserved as slide images";
+  for (const page of pages) {
+    const fit = Math.min(width / page.width, height / page.height);
+    const w = page.width * fit,
+      h = page.height * fit;
+    deck.addSlide().addImage({
+      data: `image/png;base64,${Buffer.from(page.image!).toString("base64")}`,
+      x: (width - w) / 2,
+      y: (height - h) / 2,
+      w,
+      h,
+      altText: "PDF page",
+    });
+  }
+  const data = await deck.write({
+    outputType: "nodebuffer",
+    compression: true,
+  });
+  const { rename } = await import("node:fs/promises");
+  const temporary = `${output}.${crypto.randomUUID()}.tmp`;
+  try {
+    await writeFile(temporary, data as Buffer, { flag: "wx" });
+    await rename(temporary, output);
+  } finally {
+    await rm(temporary, { force: true });
+  }
 }

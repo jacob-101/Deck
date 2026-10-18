@@ -7,6 +7,9 @@ const api: DesktopAPI = {
   openImages: () => ipcRenderer.invoke("files:open-images"),
   prepareSignature: (bytes, removeWhite) =>
     ipcRenderer.invoke("image:prepare-signature", bytes, removeWhite),
+  convertPresentation: () => ipcRenderer.invoke("files:convert-presentation"),
+  convertPDFToPptx: (pages, name) =>
+    ipcRenderer.invoke("files:convert-pdf-pptx", pages, name),
   convertWord: () => ipcRenderer.invoke("files:convert-word"),
   pickPDF: () => ipcRenderer.invoke("files:pick-pdf"),
   convertPDFToDocx: (pages, name, mode) =>
@@ -24,7 +27,7 @@ const api: DesktopAPI = {
     ipcRenderer.invoke("document:ocr", bytes, pages, language),
   cancelOCR: () => ipcRenderer.send("document:ocr-cancel"),
   setDirty: (value) => ipcRenderer.send("document:dirty", value),
-  confirmClose: () => ipcRenderer.invoke("document:confirm"),
+  confirmClose: (name) => ipcRenderer.invoke("document:confirm", name),
   closeWindow: () => ipcRenderer.send("window:close"),
   fullscreen: () => ipcRenderer.send("window:fullscreen"),
   print: () => ipcRenderer.send("window:print"),

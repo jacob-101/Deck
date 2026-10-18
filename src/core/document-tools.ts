@@ -487,7 +487,9 @@ export function docxPages(bytes: Uint8Array, mode: "layout" | "editable") {
   const doc = openPDF(bytes);
   try {
     if (doc.countPages() > 100)
-      throw new Error("PDF to DOCX supports up to 100 pages per conversion.");
+      throw new Error(
+        "Presentation and Word export support up to 100 pages per conversion.",
+      );
     return Array.from({ length: doc.countPages() }, (_, index) => {
       const page = doc.loadPage(index);
       try {

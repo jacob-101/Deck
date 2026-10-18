@@ -40,10 +40,12 @@ The application is generated in `release/mac-arm64/OpenPDF Studio.app` on Apple 
 ## What works
 
 - Native PDF open/save dialogs, recent documents, Finder open-file events, drag and drop.
+- Multiple PDF tabs with independent edits, undo/redo, save state, and remembered page/zoom/search. Use **+** or **⌘T** for the start page, **⌘O** to open another PDF, and **⌘W** to close the active PDF. Closing a dirty tab asks to save, discard, or cancel; closing the window checks all open PDFs.
 - Page thumbnails, page navigation, zoom, fit page/width, fullscreen, text selection/copy, text search, dark mode.
 - Local document analysis classifies text, scanned, image-based, and mixed PDFs; flags pages that may need OCR and detects tables/columns. A dedicated offline Apple Vision OCR workspace recognizes up to 100 selected pages per run in supported languages, previews the result, copies recognized text through the native Mac clipboard, and exports Markdown without uploading the PDF.
 - High-quality PNG/JPEG-to-PDF conversion supports 1–100 images with a visual preparation workspace. Crop with an adjustable frame, rotate in 90° steps, remove pages, add more images, and arrange page order before export. Crop and rotation are stored as PDF geometry, so original JPEG compression and source pixels stay embedded without downsampling or recompression.
 - Offline DOC/DOCX-to-PDF conversion uses an installed LibreOffice engine, with Apple Pages as a fallback. Converted PDFs open immediately with selectable text. Layout fidelity still depends on the fonts and document features available to the installed converter.
+- PDF-to-PPTX exports up to 100 pages as high-resolution slide images, preserving appearance; slide text and artwork are not individually editable. Mixed page sizes fit without stretching. PPT/PPTX-to-PDF uses installed LibreOffice or Apple Keynote, then opens the converted PDF. Both are available from the home screen; PPTX export is also in PDF Tools.
 - PDF-to-DOCX offers two honest modes: **Exact Layout** embeds high-resolution page renders for visual fidelity; **Editable Text** preserves selectable extracted text and page breaks for rewriting.
 - The offline Markdown publisher creates styled A4 PDFs with headings, lists, quotes, links, and code. LaTeX uses a restricted local MacTeX engine when installed and includes a built-in offline renderer for common sections, emphasis, lists, and inline formulas.
 - Standard PDF highlights, underline, strike-through, ink, rectangles, ellipses, arrows, text boxes, sticky notes, and visible signature stamps. Select text while a markup tool is active; drag to draw; click to place a note or text box.
@@ -79,7 +81,8 @@ Viewer defaults apply when opening a document. Appearance and annotation default
 | ------------------- | ------------------------ |
 | ⌘O                  | Open PDF                 |
 | ⌘S / ⇧⌘S            | Save / Save As           |
-| ⌘W                  | Close document           |
+| ⌘T                  | New tab / start page     |
+| ⌘W                  | Close active PDF tab     |
 | ⌘F                  | Search                   |
 | ⌘Z / ⇧⌘Z            | Undo / redo              |
 | ⌘+ / ⌘− / ⌘0        | Zoom in / out / fit page |
@@ -94,7 +97,7 @@ Viewer defaults apply when opening a document. Appearance and annotation default
 This is not full Acrobat parity. Editing existing page text/images, scanner capture, form creation, cryptographic signatures, lossy image recompression, and redaction are not implemented. Existing AcroForm fields can be filled. Structural compression may not shrink an already-optimized PDF. Drawing over text does **not** redact it.
 
 - Inputs: PDF up to 50 MB and 500 pages. Password-protected PDFs can be opened through **Unlock PDF** with the correct password and saved as an unencrypted copy.
-- History: at most 40 revisions, normally within 96 MB; at least the current and previous revisions are retained. Closing the document clears history.
+- History: per PDF tab, at most 40 revisions, normally within 96 MB; at least the current and previous revisions are retained. Closing its tab clears its history. Tabs are held in memory during the session and are not restored after quitting.
 - Print: up to 100 pages; oversized pages are rejected. It prints rendered page images, not vector text.
 - Split export: at most 100 MB of combined output per operation.
 - PDF-to-image export: up to 100 pages and 100 MB of combined output per operation. PNG is lossless; JPEG uses the selected quality.
@@ -119,6 +122,7 @@ Generated PDF.js resources are copied as bytes, avoiding macOS clonefile stalls 
 npm test
 npm run build
 npm run test:desktop
+node scripts/test-tabs.mjs
 ```
 
 Desktop tests launch actual Electron windows using Playwright, exercise the UI and real file services, and write temporary test PDFs. Native file-dialog selections are supplied by the test harness; no existing user files are modified. Screenshots and results are written to ignored `test-results/`.

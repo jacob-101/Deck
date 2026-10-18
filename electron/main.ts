@@ -25,7 +25,7 @@ import {
   writeJSON,
   writeText,
 } from "./files";
-import { createDocx, markupToPDF } from "./conversions";
+import { createDocx, createPptx, markupToPDF } from "./conversions";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -234,10 +234,14 @@ async function firstAvailable(paths: string[]) {
   }
   return null;
 }
-async function confirmClose(): Promise<"save" | "discard" | "cancel"> {
+async function confirmClose(
+  name?: string,
+): Promise<"save" | "discard" | "cancel"> {
   const { response } = await dialog.showMessageBox(win, {
     type: "question",
-    message: "Save your changes?",
+    message: name
+      ? `Save changes to “${name}”?`
+      : "Save changes in your open PDFs?",
     detail: "Your unsaved changes will be lost if you discard them.",
     buttons: ["Save", "Discard Changes", "Cancel"],
     defaultId: 0,
@@ -415,6 +419,84 @@ function registerIPC() {
       await rm(folder, { recursive: true, force: true });
     }
   });
+  ipcMain.handle("files:convert-presentation", async (event) => {
+    trusted(event);
+    const picked = await dialog.showOpenDialog(win, {
+      title: "Choose a PowerPoint document",
+      properties: ["openFile"],
+      filters: [{ name: "PowerPoint documents", extensions: ["pptx", "ppt"] }],
+    });
+    if (picked.canceled || !picked.filePaths[0]) return null;
+    const source = picked.filePaths[0];
+    const info = await stat(source);
+    if (!info.isFile() || info.size > 100 * 1024 * 1024)
+      throw new Error("Choose a PowerPoint document smaller than 100 MB.");
+    const folder = await mkdtemp(join(tmpdir(), "openpdf-presentation-"));
+    const output = join(
+      folder,
+      basename(source).replace(/\.pptx?$/i, "") + ".pdf",
+    );
+    let engine = "";
+    try {
+      const soffice = await firstAvailable([
+        "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+        "/opt/homebrew/bin/soffice",
+        "/usr/local/bin/soffice",
+      ]);
+      if (soffice) {
+        await runLocalTool(soffice, [
+          `-env:UserInstallation=${pathToFileURL(join(folder, "profile")).href}`,
+          "--headless",
+          "--convert-to",
+          "pdf:impress_pdf_Export",
+          "--outdir",
+          folder,
+          source,
+        ]);
+        engine = "LibreOffice";
+      } else if (await firstAvailable(["/Applications/Keynote.app"])) {
+        const script = `on run argv\nset inputPath to item 1 of argv\nset outputPath to item 2 of argv\ntell application "Keynote"\nset theDocument to open POSIX file inputPath\nexport theDocument to POSIX file outputPath as PDF\nclose theDocument saving no\nend tell\nend run`;
+        await runLocalTool("/usr/bin/osascript", [
+          "-e",
+          script,
+          source,
+          output,
+        ]);
+        engine = "Apple Keynote";
+      } else {
+        throw new Error(
+          "PowerPoint conversion requires LibreOffice or Apple Keynote on this Mac.",
+        );
+      }
+      const converted = await readPDF(output);
+      const saved = await dialog.showSaveDialog(win, {
+        title: "Save converted PDF",
+        defaultPath: basename(output),
+        filters: [{ name: "PDF document", extensions: ["pdf"] }],
+      });
+      if (saved.canceled || !saved.filePath) return null;
+      await atomicSave(saved.filePath, converted.bytes, null);
+      return { ...(await openPath(saved.filePath)), engine };
+    } finally {
+      await rm(folder, { recursive: true, force: true });
+    }
+  });
+  ipcMain.handle(
+    "files:convert-pdf-pptx",
+    async (event, pages: unknown, name: unknown) => {
+      trusted(event);
+      if (!Array.isArray(pages) || pages.length < 1 || pages.length > 100)
+        throw new Error("PPTX conversion supports 1–100 pages.");
+      const result = await dialog.showSaveDialog(win, {
+        title: "Save PowerPoint presentation",
+        defaultPath: `${basename(typeof name === "string" ? name : "Document").replace(/\.pdf$/i, "")}.pptx`,
+        filters: [{ name: "PowerPoint presentation", extensions: ["pptx"] }],
+      });
+      if (result.canceled || !result.filePath) return false;
+      await createPptx(pages, result.filePath);
+      return true;
+    },
+  );
   ipcMain.handle(
     "files:convert-pdf-docx",
     async (event, pages: unknown, name: unknown, mode: unknown) => {
@@ -647,9 +729,11 @@ function registerIPC() {
       return true;
     },
   );
-  ipcMain.handle("document:confirm", (event) => {
+  ipcMain.handle("document:confirm", (event, name: unknown) => {
     trusted(event);
-    return confirmClose();
+    return confirmClose(
+      typeof name === "string" ? basename(name).slice(0, 255) : undefined,
+    );
   });
   ipcMain.on("document:dirty", (event, value) => {
     trusted(event);
@@ -788,6 +872,7 @@ app.whenReady().then(async () => {
         label: "File",
         submenu: [
           item("Open PDF…", "CmdOrCtrl+O", "open"),
+          item("New Tab", "CmdOrCtrl+T", "new-tab"),
           item("Close Document", "CmdOrCtrl+W", "close"),
           item("Document Details…", "CmdOrCtrl+I", "properties"),
           { type: "separator" },

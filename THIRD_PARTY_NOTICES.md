@@ -7,6 +7,7 @@ OpenPDF Studio is licensed under AGPL-3.0-only. See LICENSE. The unmodified upst
 | MuPDF.js / MuPDF WebAssembly | AGPL-3.0-or-later                                                  | https://github.com/ArtifexSoftware/mupdf.js |
 | PDF.js                       | Apache-2.0                                                         | https://github.com/mozilla/pdf.js           |
 | Electron                     | MIT, with Chromium and third-party notices in the app distribution | https://github.com/electron/electron        |
+| PptxGenJS                    | MIT                                                                | https://github.com/gitbrent/PptxGenJS       |
 | React                        | MIT                                                                | https://github.com/facebook/react           |
 | Zustand                      | MIT                                                                | https://github.com/pmndrs/zustand           |
 | Lucide icons                 | ISC                                                                | https://github.com/lucide-icons/lucide      |

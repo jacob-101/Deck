@@ -2,6 +2,7 @@ import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { TextLayer, type PDFDocumentProxy, type RenderTask } from "pdfjs-dist";
 import type { AnnotationInfo, AnnotationInput, Tool } from "../types";
 import { annotationPreview } from "../core/annotation-preview";
+import { rasterSize } from "../core/viewer-performance";
 
 export type PageProps = {
   pdf: PDFDocumentProxy;
@@ -248,12 +249,20 @@ export const PDFPage = memo(function PDFPage({
       // Render offscreen. Resizing the visible canvas clears it immediately and
       // caused a full-page flash after every annotation revision.
       const surface = document.createElement("canvas");
-      surface.width = Math.ceil(viewport.width * density);
-      surface.height = Math.ceil(viewport.height * density);
+      const raster = rasterSize(viewport.width, viewport.height, density);
+      surface.width = raster.width;
+      surface.height = raster.height;
       render = page.render({
         canvas: surface,
         viewport,
-        transform: [density, 0, 0, density, 0, 0],
+        transform: [
+          raster.width / viewport.width,
+          0,
+          0,
+          raster.height / viewport.height,
+          0,
+          0,
+        ],
       });
       await render.promise;
       if (cancelled || !canvas.current) return;

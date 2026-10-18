@@ -41,6 +41,11 @@ export type DesktopAPI = {
     height: number;
     engine: "Rust";
   }>;
+  convertPresentation(): Promise<(OpenFile & { engine: string }) | null>;
+  convertPDFToPptx(
+    pages: { image?: Uint8Array; width: number; height: number }[],
+    name: string,
+  ): Promise<boolean>;
   convertWord(): Promise<(OpenFile & { engine: string }) | null>;
   pickPDF(): Promise<OpenFile | null>;
   convertPDFToDocx(
@@ -75,7 +80,7 @@ export type DesktopAPI = {
   ): Promise<OCRResult>;
   cancelOCR(): void;
   setDirty(value: boolean): void;
-  confirmClose(): Promise<"save" | "discard" | "cancel">;
+  confirmClose(name?: string): Promise<"save" | "discard" | "cancel">;
   closeWindow(): void;
   fullscreen(): void;
   print(): void;

@@ -40,6 +40,7 @@ type ToolId =
   | "images"
   | "unlock"
   | "docx"
+  | "pptx"
   | "compress"
   | "page-images"
   | "encrypt"
@@ -142,6 +143,12 @@ const tools: {
     title: "Unlock PDF",
     detail: "Remove password encryption from a copy",
     icon: KeyRound,
+  },
+  {
+    id: "pptx",
+    title: "PDF to PPTX",
+    detail: "One page image per PowerPoint slide",
+    icon: FileOutput,
   },
   {
     id: "docx",
@@ -348,6 +355,14 @@ export function PDFTools({
         throw new Error(
           "This PDF is already open and unlocked. Use Unlock PDF on the home screen for a protected file.",
         );
+      } else if (active === "pptx") {
+        if (!window.desktop)
+          throw new Error("PPTX export is available in the Mac app.");
+        const pages = await pdfEngine.docxPages(bytes, "layout");
+        if (await window.desktop.convertPDFToPptx(pages, name)) {
+          notify("PowerPoint presentation exported.");
+          onClose();
+        }
       } else if (active === "docx") {
         if (!window.desktop)
           throw new Error("DOCX export is available in the Mac app.");
@@ -368,6 +383,7 @@ export function PDFTools({
     active === "split" ||
     active === "images" ||
     active === "docx" ||
+    active === "pptx" ||
     active === "page-images" ||
     active === "encrypt"
       ? "Export"
@@ -868,6 +884,14 @@ export function PDFTools({
                       This file is already unlocked. Close it and choose Unlock
                       PDF from the home screen to open a protected document with
                       its password and save an unencrypted copy.
+                    </p>
+                  )}
+                  {active === "pptx" && (
+                    <p className="tool-note">
+                      Each PDF page becomes a high-resolution image on its own
+                      slide. Text and artwork are not individually editable.
+                      Mixed page sizes fit within the first page’s slide
+                      dimensions without stretching. Up to 100 pages.
                     </p>
                   )}
                   {active === "docx" && (

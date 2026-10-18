@@ -60,9 +60,10 @@ import {
   X,
 } from "lucide-react";
 import { pdfEngine } from "./core/client";
-import { useDocument } from "./core/history";
+import { isDocumentDirty, useDocument } from "./core/history";
 import { IconButton } from "./components/Button";
 import { PDFPage, rgb } from "./components/PDFPage";
+import { DocumentTabs } from "./components/DocumentTabs";
 import {
   MAX_FILE_SIZE,
   type AnnotationInput,
@@ -76,6 +77,7 @@ import {
   type Tool,
 } from "./types";
 import { parsePageRange } from "./core/ranges";
+import { pageSearchText } from "./core/viewer-performance";
 import {
   ANNOTATION_COLORS,
   COLOR_NAMES,
@@ -210,6 +212,7 @@ export default function App() {
       : preferences.appearance === "dark";
   const revision = state.revisions[state.cursor];
   const dirty = !!revision && revision.id !== state.saved;
+  const anyDirty = state.documents.some(isDocumentDirty);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [pdfRevisionId, setPdfRevisionId] = useState("");
   const pdfTaskRef = useRef<PDFDocumentLoadingTask | null>(null);
@@ -255,6 +258,7 @@ export default function App() {
     | "images"
     | "unlock"
     | "docx"
+    | "pptx"
   >(null);
   const [markupConverter, setMarkupConverter] = useState<
     "markdown" | "latex" | null
@@ -281,6 +285,19 @@ export default function App() {
   const fileInput = useRef<HTMLInputElement>(null);
   const filePurpose = useRef<"open" | "merge">("open");
   const dragPage = useRef<number | null>(null);
+  type DocumentView = {
+    page: number;
+    zoom: number;
+    scaleMode: typeof scaleMode;
+    sidebar: boolean;
+    tab: typeof tab;
+    search: string;
+    mode: typeof mode;
+    top: number;
+    left: number;
+  };
+  const documentViews = useRef(new Map<string, DocumentView>());
+  const pendingScroll = useRef<{ top: number; left: number } | null>(null);
   const count = revision?.info.pages.length ?? 0;
   const pageInfo = revision?.info.pages[Math.min(page, count - 1)];
   const scale = Math.max(
@@ -344,11 +361,11 @@ export default function App() {
     setStroke(preferences.strokeWidth);
   }, [preferences.strokeWidth]);
   useEffect(() => {
-    window.desktop?.setDirty(dirty);
+    window.desktop?.setDirty(anyDirty);
     document.title = revision
       ? `${dirty ? "• " : ""}${state.name} — OpenPDF Studio`
       : "OpenPDF Studio";
-  }, [dirty, state.name, revision]);
+  }, [dirty, anyDirty, state.name, revision]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 3800);
@@ -440,10 +457,8 @@ export default function App() {
       void (async () => {
         const matches: typeof results = [];
         for (let i = 1; i <= pdf.numPages && !cancelled; i++) {
-          const content = await (await pdf.getPage(i)).getTextContent();
-          const text = content.items
-            .map((item) => ("str" in item ? item.str : ""))
-            .join(" ");
+          const text = await pageSearchText(pdf, i);
+          if (cancelled) return;
           const lower = text.toLowerCase();
           const found = lower.indexOf(needle);
           if (found >= 0)
@@ -485,8 +500,15 @@ export default function App() {
     } else dialog.current?.close();
   }, [modal, page]);
 
-  const saveCurrent = async (saveAs = false): Promise<boolean> => {
-    const current = useDocument.getState();
+  const saveCurrent = async (
+    saveAs = false,
+    documentId = useDocument.getState().activeId,
+  ): Promise<boolean> => {
+    const store = useDocument.getState();
+    const current = store.documents.find(
+      (document) => document.id === documentId,
+    );
+    if (!current) return false;
     const entry = current.revisions[current.cursor];
     if (!entry) return false;
     if (window.desktop) {
@@ -497,26 +519,31 @@ export default function App() {
         saveAs,
       );
       if (!result) return false;
-      current.markSaved(entry.id, result.name, result.id);
+      store.markSaved(entry.id, result.name, result.id, current.id);
     } else {
       download(entry.bytes, current.name);
-      current.markSaved(entry.id, current.name, null);
+      store.markSaved(entry.id, current.name, null, current.id);
     }
     notify("PDF saved. All changes are in the file.");
     return true;
   };
-  const confirmLeave = async () => {
-    const current = useDocument.getState();
+  const confirmLeave = async (documentId = useDocument.getState().activeId) => {
+    const current = useDocument
+      .getState()
+      .documents.find((document) => document.id === documentId);
+    if (!current) return true;
     const entry = current.revisions[current.cursor];
     if (!entry || entry.id === current.saved) return true;
     const answer = window.desktop
-      ? await window.desktop.confirmClose()
+      ? await window.desktop.confirmClose(current.name)
       : window.confirm(
             "Discard unsaved changes? Cancel to return and save first.",
           )
         ? "discard"
         : "cancel";
-    return answer === "save" ? saveCurrent() : answer === "discard";
+    return answer === "save"
+      ? saveCurrent(false, documentId)
+      : answer === "discard";
   };
   const applyDocumentDefaults = () => {
     const prefs = usePreferences.getState().values;
@@ -528,10 +555,87 @@ export default function App() {
     setTool("select");
     setTab("pages");
   };
+  const rememberView = () => {
+    const id = useDocument.getState().activeId;
+    if (id)
+      documentViews.current.set(id, {
+        page,
+        zoom,
+        scaleMode,
+        sidebar,
+        tab,
+        search,
+        mode,
+        top: viewport.current?.scrollTop ?? 0,
+        left: viewport.current?.scrollLeft ?? 0,
+      });
+  };
+  const restoreView = (id: string | null) => {
+    const view = id ? documentViews.current.get(id) : undefined;
+    pendingScroll.current = view ? { top: view.top, left: view.left } : null;
+    if (view) {
+      setPage(view.page);
+      setZoom(view.zoom);
+      setScaleMode(view.scaleMode);
+      setSidebar(view.sidebar);
+      setTab(view.tab);
+      setSearch(view.search);
+      setMode(view.mode);
+    } else applyDocumentDefaults();
+    setTool("select");
+    setSelectedAnnotationId(null);
+    setEditor(null);
+    setDetails(false);
+    setAnalysis(false);
+    setSettings(null);
+    setPdf(null);
+  };
+  const activateDocument = (id: string | null) => {
+    if (busyRef.current || id === useDocument.getState().activeId) return;
+    rememberView();
+    state.activate(id);
+    restoreView(id);
+  };
+  const openDocument: typeof state.load = (...args) => {
+    rememberView();
+    state.load(...args);
+    restoreView(useDocument.getState().activeId);
+  };
+  const closeDocument = (id: string | null) => {
+    if (!id) return;
+    void perform("Closing tab…", async () => {
+      if (!(await confirmLeave(id))) return;
+      const active = useDocument.getState().activeId;
+      if (active === id) rememberView();
+      state.close(id);
+      documentViews.current.delete(id);
+      if (active === id) restoreView(useDocument.getState().activeId);
+    });
+  };
+  useEffect(() => {
+    if (!pdf || !state.activeId) return;
+    const view = pendingScroll.current;
+    if (!view) return;
+    const frame = requestAnimationFrame(() => {
+      viewport.current?.scrollTo({ top: view.top, left: view.left });
+      pendingScroll.current = null;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pdf, state.activeId]);
   const loadFile = async (file: OpenFile) => {
+    const existing =
+      file.id &&
+      useDocument
+        .getState()
+        .documents.find((document) => document.fileId === file.id);
+    if (existing) {
+      rememberView();
+      state.activate(existing.id);
+      restoreView(existing.id);
+      return;
+    }
     const result = await pdfEngine.inspect(file.bytes);
-    state.load(result.bytes, result.info, file.name, file.id);
-    applyDocumentDefaults();
+    openDocument(result.bytes, result.info, file.name, file.id);
     setSettings(null);
     setDetails(false);
     setEditor(null);
@@ -541,7 +645,6 @@ export default function App() {
       void perform(
         purpose === "merge" ? "Adding pages…" : "Opening PDF…",
         async () => {
-          if (purpose === "open" && !(await confirmLeave())) return;
           const file = await window.desktop!.open();
           if (!file) return;
           if (purpose === "open") await loadFile(file);
@@ -565,7 +668,6 @@ export default function App() {
     void perform("Opening PDF…", async () => {
       if (file.size > MAX_FILE_SIZE)
         throw new Error("Choose a PDF smaller than 50 MB.");
-      if (filePurpose.current === "open" && !(await confirmLeave())) return;
       const bytes = new Uint8Array(await file.arrayBuffer());
       if (filePurpose.current === "merge" && revision) {
         const result = await pdfEngine.editSession(
@@ -756,7 +858,16 @@ export default function App() {
     }
     if (
       busyRef.current ||
-      ((modal || editor || details || imageEditor) && name !== "save-and-close")
+      ((modal ||
+        editor ||
+        details ||
+        analysis ||
+        imageEditor ||
+        signatureModalOpen ||
+        toolsOpen ||
+        markupConverter ||
+        unlockFile) &&
+        name !== "save-and-close")
     )
       return;
     if (name === "settings" || name === "about") {
@@ -772,6 +883,9 @@ export default function App() {
         setSidebar(true);
         setTab("contents");
         break;
+      case "new-tab":
+        activateDocument(null);
+        break;
       case "open":
         chooseFile();
         break;
@@ -783,16 +897,17 @@ export default function App() {
         break;
       case "save-and-close":
         void perform("Saving…", async () => {
-          if (await saveCurrent()) {
-            window.desktop?.setDirty(false);
-            window.desktop?.closeWindow();
+          for (const document of useDocument
+            .getState()
+            .documents.filter(isDocumentDirty)) {
+            if (!(await saveCurrent(false, document.id))) return;
           }
+          window.desktop?.setDirty(false);
+          window.desktop?.closeWindow();
         });
         break;
       case "close":
-        void perform("Closing…", async () => {
-          if (await confirmLeave()) state.close();
-        });
+        closeDocument(state.activeId);
         break;
       case "undo":
         if (revision) state.undo();
@@ -821,13 +936,13 @@ export default function App() {
         break;
     }
   };
+  const openFileHandler = useRef<(file: OpenFile) => void>(() => {});
+  openFileHandler.current = (file) =>
+    void perform("Opening PDF…", () => loadFile(file));
   useEffect(() => {
     const dispose = window.desktop?.onCommand((name) => commands.current(name));
-    const fileDispose = window.desktop?.onFile(
-      (file) =>
-        void perform("Opening PDF…", async () => {
-          if (await confirmLeave()) await loadFile(file);
-        }),
+    const fileDispose = window.desktop?.onFile((file) =>
+      openFileHandler.current(file),
     );
     window.desktop?.ready();
     return () => {
@@ -885,6 +1000,7 @@ export default function App() {
             ",": "settings",
             i: "properties",
             o: "open",
+            t: "new-tab",
             s: event.shiftKey ? "save-as" : "save",
             f: "search",
             z: event.shiftKey ? "redo" : "undo",
@@ -930,11 +1046,11 @@ export default function App() {
   ]);
   useEffect(() => {
     const handler = (event: BeforeUnloadEvent) => {
-      if (dirty && !window.desktop) event.preventDefault();
+      if (anyDirty && !window.desktop) event.preventDefault();
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [dirty]);
+  }, [anyDirty]);
 
   const submitModal = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -1100,8 +1216,7 @@ export default function App() {
         true,
       );
       if (!saved) return;
-      state.load(result.bytes, result.info, saved.name, saved.id);
-      applyDocumentDefaults();
+      openDocument(result.bytes, result.info, saved.name, saved.id);
       setImageEditor(null);
       notify(
         `${images.length} image${images.length === 1 ? "" : "s"} converted with original pixels preserved.`,
@@ -1120,6 +1235,15 @@ export default function App() {
       setBusy("");
     }
   };
+  const convertPresentation = () =>
+    void perform("Converting PowerPoint presentation…", async () => {
+      if (!window.desktop)
+        throw new Error("PowerPoint conversion is available in the Mac app.");
+      const converted = await window.desktop.convertPresentation();
+      if (!converted) return;
+      await loadFile(converted);
+      notify(`Presentation converted locally with ${converted.engine}.`);
+    });
   const convertWord = () =>
     void perform("Converting Word document…", async () => {
       if (!window.desktop)
@@ -1184,23 +1308,31 @@ export default function App() {
       />
       <header className="titlebar">
         <div className="title-brand">
-          <BrandIcon size={34} />
+          <BrandIcon size={26} />
           <span>
             OpenPDF <b>Studio</b>
-            <span className="version">BETA</span>
           </span>
         </div>
-        <div className="window-document">
-          {revision ? (
-            <>
-              <FileText size={13} />
-              <span>{state.name}</span>
-              {dirty && <span className="dirty-dot" title="Unsaved changes" />}
-            </>
-          ) : (
-            <span>Your documents. Your space.</span>
-          )}
-        </div>
+        <DocumentTabs
+          documents={state.documents}
+          activeId={state.activeId}
+          disabled={
+            !!busy ||
+            !!settings ||
+            !!modal ||
+            !!editor ||
+            details ||
+            analysis ||
+            !!imageEditor ||
+            signatureModalOpen ||
+            !!toolsOpen ||
+            !!markupConverter ||
+            !!unlockFile
+          }
+          onSelect={activateDocument}
+          onClose={closeDocument}
+          onNew={() => activateDocument(null)}
+        />
         <div className="title-actions">
           {revision && (
             <IconButton
@@ -1223,6 +1355,7 @@ export default function App() {
           </IconButton>
         </div>
       </header>
+
       {revision ? (
         <>
           <div className="main-toolbar">
@@ -1260,11 +1393,16 @@ export default function App() {
                 <FolderOpen size={16} /> Open
               </button>
             </div>
-            <div className="mode-switch" aria-label="Workspace mode">
+            <div
+              className="mode-switch"
+              role="group"
+              aria-label="Workspace mode"
+            >
               {(["read", "annotate", "organize"] as const).map((item) => (
                 <button
                   key={item}
                   className={mode === item ? "selected" : ""}
+                  aria-pressed={mode === item}
                   onClick={() => {
                     setMode(item);
                     if (item !== "annotate") setTool("select");
@@ -1315,23 +1453,49 @@ export default function App() {
           </div>
           {mode === "annotate" ? (
             <div className="context-toolbar">
-              <div className="annotation-tools">
-                {tools.map(({ id, label, icon: Icon }) => (
-                  <IconButton
-                    key={id}
-                    label={label}
-                    active={tool === id}
-                    disabled={!canEdit}
-                    onClick={() => {
-                      if (id === "Stamp") {
-                        setSignatureModalOpen(true);
-                      } else {
-                        setTool(id);
-                      }
-                    }}
+              <div
+                className="annotation-tools"
+                role="toolbar"
+                aria-label="Annotation tools"
+              >
+                {[
+                  { label: "Selection", ids: ["select"] },
+                  {
+                    label: "Text markup",
+                    ids: ["Highlight", "Underline", "StrikeOut"],
+                  },
+                  {
+                    label: "Drawing and shapes",
+                    ids: ["Ink", "Square", "Circle", "Line"],
+                  },
+                  {
+                    label: "Text, notes and signatures",
+                    ids: ["FreeText", "Text", "Stamp"],
+                  },
+                ].map((group) => (
+                  <div
+                    className="annotation-tool-group"
+                    role="group"
+                    aria-label={group.label}
+                    key={group.label}
                   >
-                    <Icon size={17} />
-                  </IconButton>
+                    {tools
+                      .filter((item) => group.ids.includes(item.id))
+                      .map(({ id, label, icon: Icon }) => (
+                        <IconButton
+                          key={id}
+                          label={label}
+                          active={tool === id}
+                          disabled={!canEdit}
+                          onClick={() => {
+                            if (id === "Stamp") setSignatureModalOpen(true);
+                            else setTool(id);
+                          }}
+                        >
+                          <Icon size={17} />
+                        </IconButton>
+                      ))}
+                  </div>
                 ))}
               </div>
               <span className="divider" />
@@ -1426,16 +1590,7 @@ export default function App() {
               </button>
               <span className="context-hint">Drag pages to reorder</span>
             </div>
-          ) : (
-            <div className="context-toolbar read-toolbar">
-              <span className="document-path">
-                Workspace <ChevronRight size={12} /> <span>{state.name}</span>
-              </span>
-              <span className="context-hint">
-                <ShieldCheck size={13} /> On your device. Always.
-              </span>
-            </div>
-          )}
+          ) : null}
           <div className="workspace">
             {sidebar && (
               <aside className="sidebar">
@@ -1931,6 +2086,22 @@ export default function App() {
                     PNG or JPEG · original pixels
                   </span>
                 </button>
+                <button disabled={!!busy} onClick={convertPresentation}>
+                  <FileText size={17} />
+                  <span>
+                    <strong>PowerPoint to PDF</strong>PPT or PPTX · local
+                    conversion
+                  </span>
+                </button>
+                <button
+                  disabled={!!busy}
+                  onClick={() => openToolWithPDF("pptx")}
+                >
+                  <FileOutput size={17} />
+                  <span>
+                    <strong>PDF to PowerPoint</strong>One page image per slide
+                  </span>
+                </button>
                 <button disabled={!!busy} onClick={convertWord}>
                   <FileText size={17} />
                   <span>
@@ -1982,13 +2153,12 @@ export default function App() {
                 onClick={() =>
                   void perform("Creating sample PDF…", async () => {
                     const result = await pdfEngine.sample();
-                    state.load(
+                    openDocument(
                       result.bytes,
                       result.info,
                       "Field Notes.pdf",
                       null,
                     );
-                    applyDocumentDefaults();
                   })
                 }
               >
