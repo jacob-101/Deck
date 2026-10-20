@@ -194,7 +194,7 @@ p { margin: 0; }
 }
 
 /* ---------- App showcase ---------- */
-.showcase { padding: 8px 0 64px; }
+.showcase { padding: 8px 0 32px; }
 .showcase-frame {
   margin: 0;
   border-radius: 22px;
@@ -211,21 +211,6 @@ p { margin: 0; }
   color: var(--muted);
   text-align: center;
 }
-
-/* ---------- Trust strip ---------- */
-.trust { padding: 12px 0 72px; }
-.trust-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
-.trust-item {
-  background: var(--card); border-radius: var(--radius); padding: 28px;
-  box-shadow: var(--shadow-card);
-}
-.trust-icon {
-  width: 44px; height: 44px; border-radius: 12px; background: var(--soft);
-  display: flex; align-items: center; justify-content: center; margin-bottom: 16px;
-}
-.trust-icon svg { width: 22px; height: 22px; fill: none; stroke: var(--primary); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.trust-item h3 { font-size: 18px; margin-bottom: 8px; }
-.trust-item p { font-size: 14.5px; color: var(--muted); }
 
 /* ---------- Sections ---------- */
 .section { padding: 88px 0; }
@@ -784,7 +769,7 @@ kbd {
   .nav-links { display: none; }
   .nav-actions { margin-left: auto; }
   .privacy-grid { grid-template-columns: 1fr; gap: 40px; }
-  .trust-grid, .features-grid { grid-template-columns: 1fr 1fr; }
+  .features-grid { grid-template-columns: 1fr 1fr; }
   .s2, .s3, .s4 { grid-column: span 3; }
   .wide { grid-template-columns: 1fr; }
   .section { padding: 64px 0; }
@@ -796,8 +781,7 @@ kbd {
   .section-head { margin-bottom: 32px; }
   .section-head h2 { font-size: 26px; }
   .section-head p { font-size: 15px; }
-  .trust-grid, .features-grid { grid-template-columns: 1fr; gap: 16px; }
-  .features-grid { gap: 14px; }
+  .features-grid { grid-template-columns: 1fr; gap: 14px; }
   .feature { padding: 24px; }
   .bento { grid-template-columns: 1fr; }
   .s2, .s3, .s4, .s6 { grid-column: span 1; }
