@@ -1,2 +1,6 @@
+# Deck marketing site — pure static, no build step.
+# The repo root is an Electron app with a `build` script that needs
+# Rust/Xcode, so we must tell Netlify not to build. Serve website/ directly.
 [build]
+  command = ""
   publish = "website"
