@@ -14,7 +14,12 @@ export type ImagePDFInput = ImageFile & {
 export type RecentFile = { id: string; name: string; date: number };
 export type SaveResult = { id: string; name: string } | null;
 export type OCRResult = {
-  pages: { page: number; text: string; confidence: number }[];
+  pages: {
+    page: number;
+    text: string;
+    confidence: number;
+    uncertain?: { text: string; confidence: number }[];
+  }[];
   markdown: string;
   processingTimeMs: number;
   engine: string;
@@ -104,7 +109,8 @@ export type Tool =
   | "Line"
   | "FreeText"
   | "Text"
-  | "Stamp";
+  | "Stamp"
+  | "Redact";
 export type AnnotationInput = {
   type: Exclude<Tool, "select">;
   rect: number[];

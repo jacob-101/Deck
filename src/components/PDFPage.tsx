@@ -856,7 +856,7 @@ export const PDFPage = memo(function PDFPage({
                     pointerEvents: "auto",
                     cursor: isSelected ? "move" : "pointer",
                     border: isSelected
-                      ? "1.5px dashed var(--green, #365a47)"
+                      ? "1.5px dashed var(--green, #1560E8)"
                       : "1.5px solid transparent",
                     background: isSelected
                       ? "rgba(54, 90, 71, 0.06)"
@@ -879,7 +879,7 @@ export const PDFPage = memo(function PDFPage({
                           width: "8px",
                           height: "8px",
                           background: "#ffffff",
-                          border: "1.5px solid var(--green, #365a47)",
+                          border: "1.5px solid var(--green, #1560E8)",
                           borderRadius: "2px",
                           pointerEvents: "auto",
                         };
@@ -1016,6 +1016,14 @@ export const PDFPage = memo(function PDFPage({
                 stroke={previewColor}
                 strokeWidth={previewStroke}
               />
+            ) : previewTool === "Redact" ? (
+              <rect
+                x={Math.min(a[0], b[0])}
+                y={Math.min(a[1], b[1])}
+                width={Math.abs(b[0] - a[0])}
+                height={Math.abs(b[1] - a[1])}
+                fill="#17191a"
+              />
             ) : (
               <rect
                 x={Math.min(a[0], b[0])}
@@ -1026,7 +1034,7 @@ export const PDFPage = memo(function PDFPage({
                   previewTool === "Stamp" ? "rgba(54, 90, 71, 0.08)" : "none"
                 }
                 strokeDasharray={previewTool === "Stamp" ? "4 4" : undefined}
-                stroke={previewTool === "Stamp" ? "#365a47" : previewColor}
+                stroke={previewTool === "Stamp" ? "#1560E8" : previewColor}
                 strokeWidth={previewTool === "Stamp" ? 1.5 : previewStroke}
               />
             ))}

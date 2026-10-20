@@ -13,6 +13,122 @@ static NSString *Argument(NSArray<NSString *> *args, NSString *name) {
   return index != NSNotFound && index + 1 < args.count ? args[index + 1] : nil;
 }
 
+static BOOL ContainsDigit(NSString *string) {
+  return [string rangeOfCharacterFromSet:NSCharacterSet.decimalDigitCharacterSet].location != NSNotFound;
+}
+
+// Build structured text for one page from its Vision observations. Lines are
+// grouped into rows (by vertical proximity) and rows with two or more cells
+// are emitted as Markdown tables so column alignment survives extraction.
+// Low-confidence text — especially text containing digits — is flagged so the
+// caller can review it against the original page.
+static NSDictionary *BuildPageResult(VNRecognizeTextRequest *request) {
+  NSArray<VNRecognizedTextObservation *> *sorted =
+      [request.results sortedArrayUsingComparator:^NSComparisonResult(VNRecognizedTextObservation *a, VNRecognizedTextObservation *b) {
+        CGFloat delta = CGRectGetMidY(a.boundingBox) - CGRectGetMidY(b.boundingBox);
+        if (fabs(delta) > 0.005) return delta > 0 ? NSOrderedAscending : NSOrderedDescending;
+        return CGRectGetMinX(a.boundingBox) < CGRectGetMinX(b.boundingBox) ? NSOrderedAscending : NSOrderedDescending;
+      }];
+
+  NSMutableArray<NSDictionary *> *lines = [NSMutableArray array];
+  NSMutableArray<NSNumber *> *heights = [NSMutableArray array];
+  for (VNRecognizedTextObservation *observation in sorted) {
+    VNRecognizedText *candidate = [observation topCandidates:1].firstObject;
+    if (!candidate || candidate.string.length == 0) continue;
+    CGRect box = observation.boundingBox;
+    [lines addObject:@{
+      @"text": candidate.string,
+      @"confidence": @(candidate.confidence),
+      @"minX": @(CGRectGetMinX(box)),
+      @"midX": @(CGRectGetMidX(box)),
+      @"midY": @(CGRectGetMidY(box)),
+      @"height": @(CGRectGetHeight(box)),
+    }];
+    [heights addObject:@(CGRectGetHeight(box))];
+  }
+  if (lines.count == 0) {
+    return @{ @"text": @"", @"confidence": @(0), @"uncertain": @[] };
+  }
+
+  NSArray<NSNumber *> *sortedHeights = [heights sortedArrayUsingSelector:@selector(compare:)];
+  CGFloat medianHeight = sortedHeights[sortedHeights.count / 2].doubleValue;
+  CGFloat rowThreshold = MAX(medianHeight * 0.6, 0.008);
+
+  // Group consecutive (top-to-bottom) lines into visual rows.
+  NSMutableArray<NSMutableArray<NSDictionary *> *> *rows = [NSMutableArray array];
+  NSMutableArray<NSDictionary *> *currentRow = nil;
+  CGFloat lastMidY = CGFLOAT_MAX;
+  for (NSDictionary *line in lines) {
+    CGFloat midY = [line[@"midY"] doubleValue];
+    if (currentRow == nil || (lastMidY - midY) > rowThreshold) {
+      currentRow = [NSMutableArray array];
+      [rows addObject:currentRow];
+    }
+    [currentRow addObject:line];
+    lastMidY = midY;
+  }
+
+  NSMutableArray<NSString *> *output = [NSMutableArray array];
+  NSMutableArray<NSDictionary *> *uncertain = [NSMutableArray array];
+  double totalConfidence = 0;
+  NSInteger lineCount = 0;
+
+  NSUInteger index = 0;
+  while (index < rows.count) {
+    NSArray<NSDictionary *> *row = rows[index];
+    if (row.count >= 2) {
+      // Table block: consecutive rows with two or more cells.
+      NSUInteger end = index;
+      NSInteger columnCount = 0;
+      while (end < rows.count && rows[end].count >= 2) {
+        columnCount = MAX(columnCount, (NSInteger)rows[end].count);
+        end++;
+      }
+      columnCount = MIN(columnCount, 8);
+
+      NSMutableArray<NSString *> *header = [NSMutableArray array];
+      for (NSInteger column = 0; column < columnCount; column++) {
+        [header addObject:column < (NSInteger)row.count ? row[column][@"text"] : @""];
+      }
+      [output addObject:[NSString stringWithFormat:@"| %@ |", [header componentsJoinedByString:@" | "]]];
+      NSMutableArray<NSString *> *divider = [NSMutableArray array];
+      for (NSInteger column = 0; column < columnCount; column++) [divider addObject:@"---"];
+      [output addObject:[NSString stringWithFormat:@"| %@ |", [divider componentsJoinedByString:@" | "]]];
+
+      for (NSUInteger rowIndex = index + 1; rowIndex < end; rowIndex++) {
+        NSArray<NSDictionary *> *tableRow = rows[rowIndex];
+        NSMutableArray<NSString *> *cells = [NSMutableArray array];
+        for (NSInteger column = 0; column < columnCount; column++) {
+          [cells addObject:column < (NSInteger)tableRow.count ? tableRow[column][@"text"] : @""];
+        }
+        [output addObject:[NSString stringWithFormat:@"| %@ |", [cells componentsJoinedByString:@" | "]]];
+      }
+      index = end;
+    } else {
+      [output addObject:row[0][@"text"]];
+      index++;
+    }
+  }
+
+  for (NSDictionary *line in lines) {
+    double confidence = [line[@"confidence"] doubleValue];
+    NSString *text = line[@"text"];
+    totalConfidence += confidence;
+    lineCount++;
+    BOOL lowDigit = confidence < 0.55 && ContainsDigit(text);
+    BOOL veryLow = confidence < 0.4;
+    if (lowDigit || veryLow) {
+      [uncertain addObject:@{ @"text": text, @"confidence": @(confidence) }];
+    }
+  }
+
+  return @{
+    @"text": [output componentsJoinedByString:@"\n"],
+    @"confidence": @(lineCount ? totalConfidence / lineCount : 0),
+    @"uncertain": uncertain,
+  };
+}
+
 int main(int argc, const char *argv[]) {
   @autoreleasepool {
     NSDate *started = [NSDate date];
@@ -39,7 +155,9 @@ int main(int argc, const char *argv[]) {
       NSInteger number = value.integerValue;
       PDFPage *page = [document pageAtIndex:number - 1];
       NSRect bounds = [page boundsForBox:kPDFDisplayBoxMediaBox];
-      CGFloat scale = MIN(2.0, 4096.0 / MAX(bounds.size.width, bounds.size.height));
+      // Render at 300 DPI (was ~144) for small statement text and digits,
+      // capped at 8192 px on the long edge to bound bitmap memory.
+      CGFloat scale = MIN(300.0 / 72.0, 8192.0 / MAX(bounds.size.width, bounds.size.height));
       NSInteger width = MAX(1, (NSInteger)ceil(bounds.size.width * scale));
       NSInteger height = MAX(1, (NSInteger)ceil(bounds.size.height * scale));
       NSBitmapImageRep *bitmap = [[NSBitmapImageRep alloc]
@@ -67,21 +185,12 @@ int main(int argc, const char *argv[]) {
       VNImageRequestHandler *handler = [[VNImageRequestHandler alloc] initWithCGImage:image options:@{}];
       if (![handler performRequests:@[request] error:&error])
         Fail([NSString stringWithFormat:@"OCR failed on page %ld: %@", (long)number, error.localizedDescription]);
-      NSArray<VNRecognizedTextObservation *> *observations = [request.results sortedArrayUsingComparator:^NSComparisonResult(VNRecognizedTextObservation *a, VNRecognizedTextObservation *b) {
-        CGFloat delta = CGRectGetMidY(a.boundingBox) - CGRectGetMidY(b.boundingBox);
-        if (fabs(delta) > 0.01) return delta > 0 ? NSOrderedAscending : NSOrderedDescending;
-        return CGRectGetMinX(a.boundingBox) < CGRectGetMinX(b.boundingBox) ? NSOrderedAscending : NSOrderedDescending;
-      }];
-      NSMutableArray<NSString *> *lines = [NSMutableArray array];
-      double confidence = 0;
-      for (VNRecognizedTextObservation *observation in observations) {
-        VNRecognizedText *candidate = [observation topCandidates:1].firstObject;
-        if (candidate) { [lines addObject:candidate.string]; confidence += candidate.confidence; }
-      }
-      NSString *text = [lines componentsJoinedByString:@"\n"];
-      double average = lines.count ? confidence / lines.count : 0;
-      [outputPages addObject:@{ @"page": @(number), @"text": text, @"confidence": @(average) }];
-      [markdownPages addObject:[NSString stringWithFormat:@"<!-- Page %ld -->\n\n## Page %ld\n\n%@", (long)number, (long)number, text]];
+
+      NSDictionary *pageResult = BuildPageResult(request);
+      NSMutableDictionary *entry = [pageResult mutableCopy];
+      entry[@"page"] = @(number);
+      [outputPages addObject:entry];
+      [markdownPages addObject:[NSString stringWithFormat:@"<!-- Page %ld -->\n\n## Page %ld\n\n%@", (long)number, (long)number, entry[@"text"]]];
     }
     NSDictionary *result = @{
       @"pages": outputPages,

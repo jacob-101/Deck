@@ -1,3 +1,5 @@
+import bodyFont from "@fontsource/dm-sans/files/dm-sans-latin-400-normal.woff2";
+import headingFont from "@fontsource/plus-jakarta-sans/files/plus-jakarta-sans-latin-800-normal.woff2";
 import pptxgen from "pptxgenjs";
 import { BrowserWindow } from "electron";
 import {
@@ -234,7 +236,7 @@ function latexFallbackHTML(source: string) {
 }
 
 const pageHTML = (body: string, title: string) =>
-  `<!doctype html><meta charset="utf-8"><title>${xml(title)}</title><style>@page{size:A4;margin:20mm 18mm}*{box-sizing:border-box}body{font:11.5pt/1.58 -apple-system,BlinkMacSystemFont,"Helvetica Neue",Arial,sans-serif;color:#202421;margin:0}h1{font-size:27pt;line-height:1.15;margin:0 0 18pt}h2{font-size:20pt;margin:22pt 0 9pt}h3{font-size:15pt;margin:18pt 0 7pt}p{margin:0 0 9pt}ul{margin:0 0 12pt;padding-left:22pt}li{margin:3pt 0}blockquote{margin:12pt 0;padding:9pt 14pt;border-left:3px solid #476a56;background:#f2f5f1;color:#445047}pre{white-space:pre-wrap;background:#f3f4f2;padding:12pt;border-radius:6pt;font:9.5pt/1.45 ui-monospace,monospace}code,.math{font-family:ui-monospace,monospace}.math{padding:1pt 4pt;background:#f4f4ef;border-radius:3pt}a{color:#315d45}.space{height:6pt}hr{border:0;border-top:1px solid #d8ddd8;margin:18pt 0}</style><body>${body}</body>`;
+  `<!doctype html><meta charset="utf-8"><title>${xml(title)}</title><style>@font-face{font-family:"DM Sans";font-style:normal;font-weight:400;src:url("${bodyFont}") format("woff2")}@font-face{font-family:"Plus Jakarta Sans";font-style:normal;font-weight:800;src:url("${headingFont}") format("woff2")}@page{size:A4;margin:20mm 18mm}*{box-sizing:border-box}body{font:11.5pt/1.58 "DM Sans",-apple-system,system-ui,"Helvetica Neue",sans-serif;color:#0F1F44;margin:0}h1,h2,h3{font-family:"Plus Jakarta Sans","DM Sans",sans-serif;font-weight:800;letter-spacing:-.4pt}h1{font-size:27pt;line-height:1.15;margin:0 0 18pt}h2{font-size:20pt;margin:22pt 0 9pt}h3{font-size:15pt;margin:18pt 0 7pt}p{margin:0 0 9pt}ul{margin:0 0 12pt;padding-left:22pt}li{margin:3pt 0}blockquote{margin:12pt 0;padding:9pt 14pt;border-left:3px solid #1560E8;background:#EAF1FE;color:#0F1F44}pre{white-space:pre-wrap;background:#EEF4FD;padding:12pt;border-radius:6pt;font:9.5pt/1.45 ui-monospace,monospace}code,.math{font-family:ui-monospace,monospace}.math{padding:1pt 4pt;background:#EAF1FE;border-radius:3pt}a{color:#1560E8}a:visited{color:#5B6B8C}.space{height:6pt}hr{border:0;border-top:1px solid #D5E1F7;margin:18pt 0}</style><body>${body}</body>`;
 
 async function printHTML(parent: BrowserWindow, html: string) {
   const view = new BrowserWindow({
@@ -249,6 +251,9 @@ async function printHTML(parent: BrowserWindow, html: string) {
   try {
     await view.loadURL(
       `data:text/html;charset=utf-8,${encodeURIComponent(html)}`,
+    );
+    await view.webContents.executeJavaScript(
+      "document.fonts.ready.then(() => true)",
     );
     return new Uint8Array(
       await view.webContents.printToPDF({

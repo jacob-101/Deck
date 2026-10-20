@@ -768,8 +768,8 @@ function createWindow() {
     minHeight: 650,
     title: "OpenPDF Studio",
     titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 19, y: 22 },
-    backgroundColor: "#f6f5f2",
+    trafficLightPosition: { x: 19, y: 19 },
+    backgroundColor: "#E4ECFA",
     show: false,
     webPreferences: {
       preload: join(__dirname, "preload.cjs"),

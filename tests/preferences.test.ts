@@ -81,6 +81,20 @@ describe("workspace preferences", () => {
       }).appearance,
     ).toBe("system");
   });
+  it("migrates the legacy forest default theme to azure", () => {
+    expect(
+      readPreferences({
+        getItem: (key) =>
+          key === "openpdf:preferences:v1" ? '{"theme":"forest"}' : null,
+      }).theme,
+    ).toBe("azure");
+    expect(
+      readPreferences({
+        getItem: (key) =>
+          key === "openpdf:preferences:v1" ? '{"theme":"clay"}' : null,
+      }).theme,
+    ).toBe("clay");
+  });
 });
 
 describe("saved signatures storage", () => {

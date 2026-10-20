@@ -340,6 +340,12 @@ function addAnnotation(page: mupdf.PDFPage, input: AnnotationInput) {
           : [[x1, y1, x2, y1, x1, y2, x2, y2]]) as mupdf.Quad[],
       );
       if (input.type === "Highlight") annotation.setOpacity(0.42);
+    } else if (input.type === "Redact") {
+      const [x1, y1, x2, y2] = input.rect;
+      annotation.setRect(input.rect as mupdf.Rect);
+      annotation.setQuadPoints(
+        [[x1, y1, x2, y1, x1, y2, x2, y2]] as mupdf.Quad[],
+      );
     } else if (input.type === "Ink") {
       annotation.setInkList([input.points as mupdf.Point[]]);
     } else if (input.type === "Line") {
@@ -428,6 +434,7 @@ export function editDocument(doc: mupdf.PDFDocument, command: EditCommand) {
       const page = doc.loadPage(command.page);
       try {
         addAnnotation(page, command.annotation);
+        if (command.annotation.type === "Redact") page.applyRedactions();
       } finally {
         page.destroy();
       }
@@ -562,14 +569,14 @@ export function createSample(): Uint8Array {
       ],
     ];
     sections.forEach(([title, subtitle, description], index) => {
-      let content = `0.986 0.979 0.957 rg 0 0 612 792 re f\n`;
+      let content = `0.953 0.969 0.996 rg 0 0 612 792 re f\n`;
       content += text(
         "OPENPDF  /  FIELD NOTES",
         52,
         739,
         10,
         "F2",
-        "0.24 0.37 0.30",
+        "0.08 0.38 0.91",
       );
       content += text(
         `VOL. 01     /     ${String(index + 1).padStart(2, "0")}`,
@@ -577,11 +584,11 @@ export function createSample(): Uint8Array {
         739,
         9,
       );
-      content += "0.75 0.78 0.72 RG 0.5 w 52 719 m 560 719 l S\n";
+      content += "0.62 0.74 0.95 RG 0.5 w 52 719 m 560 719 l S\n";
       content += text(title, 52, 635, 38, "F2");
-      content += text(subtitle, 52, 586, 40, "F3", "0.24 0.37 0.30");
+      content += text(subtitle, 52, 586, 40, "F3", "0.08 0.38 0.91");
       content += text(description, 52, 548, 11);
-      content += "0.88 0.91 0.85 rg 52 336 508 170 re f\n";
+      content += "0.90 0.94 1.00 rg 52 336 508 170 re f\n";
       content += text(
         [
           "SPACE TO THINK",
@@ -593,7 +600,7 @@ export function createSample(): Uint8Array {
         476,
         10,
         "F2",
-        "0.24 0.37 0.30",
+        "0.08 0.38 0.91",
       );
       content += text(
         [
@@ -640,7 +647,7 @@ export function createSample(): Uint8Array {
         131,
         11,
       );
-      content += "0.75 0.78 0.72 RG 0.5 w 52 77 m 560 77 l S\n";
+      content += "0.62 0.74 0.95 RG 0.5 w 52 77 m 560 77 l S\n";
       content += text("Made for the way you work.", 52, 54, 9, "F3");
       content += text(`OPENPDF STUDIO    /    ${index + 1}`, 434, 54, 8);
       const page = doc.addPage(

@@ -4,7 +4,6 @@ import {
   ChevronRight,
   CircleHelp,
   HardDrive,
-  Keyboard,
   Monitor,
   Moon,
   Palette,
@@ -99,23 +98,11 @@ export function Settings({
   }, []);
   const theme = THEMES.find((t) => t.id === values.theme)!;
   const titles = {
-    general: [
-      "Make yourself at home.",
-      "The little things that make this workspace yours.",
-    ],
-    appearance: [
-      "A space that feels like you.",
-      "A considered palette, in whichever light you work best.",
-    ],
-    editing: ["Make your mark.", "Choose the tools you reach for first."],
-    privacy: [
-      "Your files stay your files.",
-      "Private by architecture. No switches to hunt for.",
-    ],
-    about: [
-      "Good tools. Open possibilities.",
-      "A little less friction between you and the page.",
-    ],
+    general: ["General", "Document view and keyboard shortcuts."],
+    appearance: ["Appearance", "Theme, palette, and motion."],
+    editing: ["Annotations", "Default annotation styles."],
+    privacy: ["Privacy", "Storage and network access."],
+    about: ["About", "Version and licenses."],
   };
   return (
     <dialog
@@ -128,13 +115,11 @@ export function Settings({
       <div className="settings-shell">
         <aside className="settings-sidebar">
           <div className="settings-brand">
-            <BrandIcon size={48} />
+            <BrandIcon size={32} />
             <div>
               <strong>OpenPDF</strong>
-              <span>STUDIO</span>
             </div>
           </div>
-          <div className="settings-label">WORKSPACE SETTINGS</div>
           <nav aria-label="Settings sections">
             {sections.map(({ id, label, icon: Icon }) => (
               <button
@@ -161,10 +146,7 @@ export function Settings({
         </aside>
         <section className="settings-main">
           <header className="settings-titlebar">
-            <span>
-              Settings <span>/</span>{" "}
-              {sections.find((s) => s.id === section)?.label}
-            </span>
+            <span>Settings</span>
             <IconButton label="Close settings" onClick={onClose}>
               <X size={18} />
             </IconButton>
@@ -178,7 +160,7 @@ export function Settings({
             </div>
             {section === "general" && (
               <>
-                <h3 className="setting-group-title">OPENING DOCUMENTS</h3>
+                <h3 className="setting-group-title">Documents</h3>
                 <div className="setting-group">
                   <Row
                     title="Default page view"
@@ -208,7 +190,7 @@ export function Settings({
                     />
                   </Row>
                 </div>
-                <h3 className="setting-group-title">A FEW USEFUL SHORTCUTS</h3>
+                <h3 className="setting-group-title">Keyboard shortcuts</h3>
                 <div className="shortcut-grid">
                   {[
                     ["Open a PDF", "⌘ O"],
@@ -224,18 +206,11 @@ export function Settings({
                     </div>
                   ))}
                 </div>
-                <div className="settings-callout">
-                  <Keyboard size={18} />
-                  <p>
-                    Built around your keyboard. Use the arrow keys to move
-                    between pages, or Escape to return to the selection tool.
-                  </p>
-                </div>
               </>
             )}
             {section === "appearance" && (
               <>
-                <h3 className="setting-group-title">APPEARANCE</h3>
+                <h3 className="setting-group-title">Theme</h3>
                 <div className="appearance-options">
                   {(
                     [
@@ -279,7 +254,7 @@ export function Settings({
                   ))}
                 </div>
                 <div className="theme-heading">
-                  <h3 className="setting-group-title">WORKSPACE PALETTE</h3>
+                  <h3 className="setting-group-title">Palette</h3>
                   <span>{theme.name}</span>
                 </div>
                 <div className="theme-options">
@@ -318,9 +293,9 @@ export function Settings({
             {section === "editing" && (
               <>
                 <div className="annotation-preview">
-                  <span className="preview-label">YOUR MARK, PREVIEWED</span>
+                  <span className="preview-label">Preview</span>
                   <div>
-                    A thought{" "}
+                    Sample{" "}
                     <span
                       style={{
                         backgroundColor: `${values.annotationColor}55`,
@@ -328,17 +303,17 @@ export function Settings({
                         textDecorationThickness: values.strokeWidth,
                       }}
                     >
-                      worth keeping.
+                      highlighted text
                     </span>
                   </div>
                   <svg
-                    width="165"
-                    height="28"
+                    width="72"
+                    height="20"
                     viewBox="0 0 165 28"
                     aria-hidden="true"
                   >
                     <path
-                      d="M3 19 Q40 3 73 16 T159 10"
+                      d="M3 14 H159"
                       fill="none"
                       stroke={values.annotationColor}
                       strokeWidth={values.strokeWidth}
@@ -346,7 +321,7 @@ export function Settings({
                     />
                   </svg>
                 </div>
-                <h3 className="setting-group-title">ANNOTATION DEFAULTS</h3>
+                <h3 className="setting-group-title">Defaults</h3>
                 <div className="setting-group">
                   <Row
                     title="Starting color"
@@ -435,26 +410,18 @@ export function Settings({
                     title="Text box outline"
                     detail="Draw a subtle border box around added text (off by default for clean text)."
                   >
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={values.textBackground}
-                      aria-label="Draw a subtle border box around added text"
-                      className={`switch ${values.textBackground ? "active" : ""}`}
-                      onClick={() =>
-                        update({ textBackground: !values.textBackground })
-                      }
-                    >
-                      <span className="switch-thumb" />
-                    </button>
+                    <Toggle
+                      label="Draw a subtle border box around added text"
+                      value={values.textBackground}
+                      onChange={(textBackground) => update({ textBackground })}
+                    />
                   </Row>
                 </div>
                 <div className="settings-callout">
                   <PenLine size={18} />
                   <p>
-                    New defaults apply immediately. You can still change color
-                    and line weight in the annotation toolbar. Existing
-                    annotations stay exactly as they are.
+                    Applies to new annotations. Existing annotations keep their
+                    styles.
                   </p>
                 </div>
               </>
@@ -462,15 +429,14 @@ export function Settings({
             {section === "privacy" && (
               <>
                 <div className="privacy-hero">
-                  <ShieldCheck size={28} />
+                  <ShieldCheck size={20} />
                   <div>
-                    <strong>Local by design.</strong>
+                    <strong>Network access</strong>
                     <p>
                       Your PDFs are processed on your Mac. The packaged app
                       blocks outgoing web requests.
                     </p>
                   </div>
-                  <span>ALWAYS ON</span>
                 </div>
                 <div className="privacy-facts">
                   {[
@@ -487,7 +453,7 @@ export function Settings({
                     </div>
                   ))}
                 </div>
-                <h3 className="setting-group-title">ON THIS DEVICE</h3>
+                <h3 className="setting-group-title">History</h3>
                 <div className="setting-group">
                   <Row
                     title="Recent documents"
@@ -529,7 +495,7 @@ export function Settings({
             {section === "about" && (
               <>
                 <div className="about-product">
-                  <BrandIcon size={92} />
+                  <BrandIcon size={48} />
                   <div>
                     <h3>
                       OpenPDF <span>Studio</span>
@@ -538,13 +504,8 @@ export function Settings({
                       Version {APP_VERSION}{" "}
                       <span className="release-tag">EARLY ACCESS</span>
                     </p>
-                    <span>A thoughtful PDF workspace for Mac.</span>
+                    <span>Local PDF editor for macOS.</span>
                   </div>
-                </div>
-                <div className="about-principles">
-                  <span>OPEN SOURCE</span>
-                  <span>OFFLINE FIRST</span>
-                  <span>MADE FOR MAC</span>
                 </div>
                 <div className="setting-group">
                   <Row
@@ -555,15 +516,13 @@ export function Settings({
                   </Row>
                 </div>
                 <p className="about-limits">
-                  This early release reads, annotates, organizes, and saves PDFs
-                  up to 50 MB / 500 pages, with local Apple Vision OCR for up to
-                  100 selected pages per run. Existing-text editing, forms,
-                  protected PDFs, and digital signatures are not yet supported.
-                  Saving may invalidate existing signatures.
+                  PDFs up to 50 MB / 500 pages. Apple Vision OCR supports up to
+                  100 selected pages per run. Saving changes may invalidate
+                  existing digital signatures.
                 </p>
                 <div className="reset-settings">
                   <div>
-                    <strong>Start fresh</strong>
+                    <strong>Reset preferences</strong>
                     <p>
                       Restore preferences. Your documents are never touched.
                     </p>

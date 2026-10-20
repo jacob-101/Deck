@@ -587,6 +587,41 @@ describe("actual PDF operations", () => {
     ).toThrow("Signature image data is required");
   });
 
+  it("permanently removes text under a Redact annotation", () => {
+    // The sample title "A little less friction." sits near the top of page 0.
+    const redacted = edit(sample, {
+      type: "annotate",
+      page: 0,
+      annotation: {
+        type: "Redact",
+        rect: [52, 116, 402, 168],
+        color: [0, 0, 0],
+        width: 1,
+      },
+    });
+    const text = pageText(redacted);
+    expect(text).not.toContain("A little less friction.");
+    expect(text).toContain("A little more focus.");
+    // The redaction is baked into the page and the marker annotation is gone.
+    expect(inspect(redacted).pages[0].annotations).toHaveLength(0);
+  });
+
+  it("redaction works through the duplicate and merge flows without leaking text", () => {
+    const redacted = edit(sample, {
+      type: "annotate",
+      page: 0,
+      annotation: {
+        type: "Redact",
+        rect: [52, 116, 402, 168],
+        color: [0, 0, 0],
+        width: 1,
+      },
+    });
+    expect(pageText(redacted, 0)).not.toContain("A little less friction.");
+    const merged = edit(sample, { type: "merge", bytes: redacted });
+    expect(pageText(merged, 4)).not.toContain("A little less friction.");
+  });
+
   it("creates, renders, and updates FreeText with custom font, size, multiline and Unicode text", () => {
     const unicodeText =
       "Line 1: Café & résumé — 100€\nLine 2: “Quotes” & ‘symbols’ ©";

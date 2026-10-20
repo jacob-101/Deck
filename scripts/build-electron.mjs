@@ -4,6 +4,7 @@ await build({
   outdir: "dist-electron",
   outExtension: { ".js": ".cjs" },
   bundle: true,
+  loader: { ".woff2": "dataurl" },
   platform: "node",
   format: "cjs",
   target: "node22",

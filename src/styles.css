@@ -38,7 +38,8 @@
 }
 
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+  font-family: "DM Sans", -apple-system, BlinkMacSystemFont, "Helvetica Neue",
+    sans-serif;
   color: #2b302f;
   background: #f6f5f2;
   font-synthesis: none;
@@ -125,6 +126,19 @@ h3,
 p {
   margin: 0;
 }
+h1,
+h2,
+h3,
+.primary,
+.secondary,
+.mode-switch button,
+.title-brand,
+.document-tab-select,
+.sidebar-heading h2,
+.eyebrow {
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+  letter-spacing: -0.2px;
+}
 button,
 input,
 select,
@@ -135,7 +149,7 @@ button {
   user-select: none;
 }
 ::selection {
-  background: #7aa98260;
+  background: #1560e833;
 }
 ::-webkit-scrollbar {
   width: 7px;
@@ -1570,8 +1584,9 @@ button {
   pointer-events: none;
 }
 .drop-overlay h2 {
-  font-family: Georgia, serif;
-  font-weight: 400;
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.5px;
   font-size: 35px;
   margin: 20px 0 10px;
 }
@@ -2515,4 +2530,734 @@ button {
   @page {
     margin: 0;
   }
+}
+
+/* ============================================================
+   Sealdesk bold pass — navy chrome, bigger type, airier layout
+   ============================================================ */
+:root {
+  font-size: 14px;
+}
+
+/* Navy titlebar (Azure) */
+:root[data-palette="azure"] .titlebar {
+  background: #0f2358;
+  color: #eaf1fe;
+  border-bottom: 1px solid #1e3370;
+}
+:root[data-palette="azure"] .title-brand {
+  color: #ffffff;
+  font-weight: 800;
+}
+:root[data-palette="azure"] .title-brand b {
+  color: #9db0d8;
+}
+:root[data-palette="azure"] .brand-mark {
+  background: #1560e8;
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+:root[data-palette="azure"] .document-tab {
+  color: #c7d5f2;
+}
+:root[data-palette="azure"] .document-tab:not(.active):hover {
+  background: #1e3370;
+  color: #ffffff;
+}
+:root[data-palette="azure"] .document-tab.active {
+  background: #ffffff;
+  color: #0f2358;
+  border-color: transparent;
+}
+:root[data-palette="azure"] .document-tab.active .document-tab-select svg {
+  color: #1560e8;
+}
+:root[data-palette="azure"] .document-tab-close,
+:root[data-palette="azure"] .document-tab-new {
+  color: #c7d5f2;
+}
+:root[data-palette="azure"] .document-tab-close:hover,
+:root[data-palette="azure"] .document-tab-new:hover {
+  background: #2a3f78;
+  color: #ffffff;
+}
+:root[data-palette="azure"] .title-actions .icon-button {
+  color: #c7d5f2;
+}
+:root[data-palette="azure"] .title-actions .icon-button:hover {
+  background: #1e3370;
+  color: #ffffff;
+}
+:root[data-palette="azure"] .titlebar .title-actions {
+  border-left-color: #2a3f78;
+}
+
+/* Bold headings — Plus Jakarta Sans 700/800, no serif italic */
+h1,
+h2,
+h3 {
+  font-weight: 700;
+}
+.welcome h1 {
+  font-weight: 800;
+}
+.welcome h1 em {
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+  font-style: normal;
+  font-weight: 800;
+  color: var(--green);
+}
+
+/* Airier spacing */
+.main-toolbar {
+  padding: 0 22px;
+}
+.context-toolbar {
+  padding: 0 24px;
+}
+.sidebar-heading {
+  padding: 20px 24px 14px;
+}
+.statusbar {
+  padding: 0 24px;
+}
+
+/* ============================================================
+   Sealdesk redesign
+   ============================================================ */
+
+/* Title bar — taller, bolder brand, pill tabs */
+.titlebar {
+  height: 60px;
+  min-height: 60px;
+  padding: 0 18px 0 92px;
+  gap: 18px;
+}
+.title-brand {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.4px;
+}
+.title-brand b {
+  color: var(--muted);
+}
+.brand-mark {
+  width: 30px;
+  height: 32px;
+  border-radius: 9px;
+  box-shadow: 0 4px 12px rgba(21, 96, 232, 0.25);
+}
+.document-tab {
+  max-width: 224px;
+  height: 36px;
+  border-radius: 10px;
+  padding: 0 4px;
+}
+.document-tab.active {
+  box-shadow:
+    0 1px 2px rgba(21, 54, 125, 0.06),
+    0 6px 16px rgba(21, 54, 125, 0.1);
+}
+.document-tab-select {
+  font-size: 12.5px;
+}
+
+/* Main toolbar */
+.main-toolbar {
+  height: 54px;
+  min-height: 54px;
+  padding: 0 18px;
+}
+
+/* Mode switch — solid pill */
+.mode-switch {
+  border-radius: 11px;
+  padding: 3px;
+  gap: 2px;
+}
+.mode-switch button {
+  padding: 7px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+}
+.mode-switch button.selected {
+  background: var(--green);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(21, 96, 232, 0.28);
+}
+
+/* Context toolbar */
+.context-toolbar {
+  height: 52px;
+  min-height: 52px;
+  padding: 0 20px;
+  gap: 8px;
+}
+
+/* Icon + annotation buttons */
+.icon-button {
+  border-radius: 9px;
+}
+.annotation-tools .icon-button {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+.annotation-tools .icon-button.active {
+  background: var(--green);
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(21, 96, 232, 0.28);
+}
+.annotation-tool-group + .annotation-tool-group {
+  border-left: 1px solid var(--line);
+  padding-left: 9px;
+}
+
+/* Sidebar — card thumbnails, blue selection ring */
+.sidebar {
+  width: 224px;
+  min-width: 224px;
+}
+.sidebar-tabs {
+  gap: 18px;
+  height: 56px;
+  min-height: 56px;
+}
+.sidebar-heading {
+  padding: 18px 21px 12px;
+}
+.thumbnail-paper {
+  border-radius: 8px;
+}
+.thumbnail.selected .thumbnail-paper {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px var(--green-soft);
+  background: var(--green-soft);
+}
+.thumbnail .pdf-page {
+  box-shadow: 0 2px 8px rgba(21, 54, 125, 0.14);
+}
+
+/* Right panel — annotations */
+.right-panel {
+  width: 300px;
+  min-width: 300px;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.right-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 12px;
+}
+.right-panel-head h2 {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.1px;
+}
+.right-panel-head span {
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--soft);
+  padding: 2px 9px;
+  border-radius: 10px;
+}
+.right-panel .notes-panel {
+  flex: 1;
+  overflow: auto;
+  padding: 0 16px 20px;
+}
+
+/* Canvas — soft backdrop, strong page shadow */
+.document-area {
+  background: var(--canvas);
+}
+.page-stage {
+  padding: 34px 48px 24px;
+}
+.pdf-page {
+  box-shadow:
+    0 2px 6px rgba(21, 54, 125, 0.06),
+    0 18px 44px rgba(21, 54, 125, 0.16);
+}
+
+/* Statusbar */
+.statusbar {
+  height: 48px;
+  min-height: 48px;
+  padding: 0 20px;
+}
+
+/* Buttons */
+.primary {
+  border-radius: 11px;
+  box-shadow: 0 2px 10px rgba(21, 96, 232, 0.28);
+}
+.secondary {
+  border-radius: 11px;
+}
+.text-button {
+  border-radius: 9px;
+}
+
+/* Welcome — spacious, card-based */
+.welcome {
+  padding: 0 48px;
+}
+.welcome h1 {
+  letter-spacing: -2.5px;
+}
+.welcome-converters {
+  gap: 10px;
+}
+.welcome-converters button {
+  border-radius: 13px;
+  padding: 13px 14px;
+}
+.recent-list > button {
+  border-radius: 13px;
+  padding: 14px;
+}
+.welcome-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 4px 0 12px;
+}
+.welcome-section-title h2 {
+  font-size: 13px;
+  font-weight: 700;
+}
+.welcome-section-title span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Modals */
+.modal {
+  border-radius: 18px;
+  box-shadow: 0 24px 80px rgba(15, 35, 88, 0.28);
+}
+.modal-icon {
+  border-radius: 13px;
+}
+.modal textarea,
+.modal input {
+  border-radius: 9px;
+}
+.modal-actions .primary,
+.modal-actions .secondary {
+  border-radius: 10px;
+}
+
+/* ============================================================
+   Welcome — Sealdesk Home layout (navy sidebar + body)
+   ============================================================ */
+.welcome {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+  overflow: hidden;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+}
+.welcome-nav {
+  width: 232px;
+  min-width: 232px;
+  background: #0f2358;
+  color: #c7d5f2;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 14px 18px;
+}
+.welcome-nav-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 24px;
+  color: #ffffff;
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+.welcome-nav nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.welcome-nav nav button {
+  height: 44px;
+  border-radius: 13px;
+  color: #c7d5f2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 14px;
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+  font-size: 14.5px;
+  font-weight: 600;
+  text-align: left;
+}
+.welcome-nav nav button:hover {
+  background: #1e3370;
+  color: #ffffff;
+}
+.welcome-nav nav button.active {
+  background: #f3f7fe;
+  color: #0f2358;
+}
+.welcome-nav-local {
+  margin-top: auto;
+  border-radius: 20px;
+  background: #cfe0fb;
+  color: #0f2358;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.welcome-nav-local svg {
+  color: #1560e8;
+}
+.welcome-nav-local strong {
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+}
+.welcome-nav-local span {
+  font-size: 12px;
+  color: #27407f;
+  line-height: 1.4;
+}
+.welcome-body {
+  flex: 1;
+  min-width: 0;
+  overflow: auto;
+  padding: 32px 40px 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.welcome-heading h1 {
+  font-size: 34px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+  color: var(--text);
+}
+.welcome-heading p {
+  color: var(--muted);
+  font-size: 15px;
+  margin-top: 6px;
+}
+.welcome-dropzone {
+  border: 2px dashed #9dbae9;
+  border-radius: 24px;
+  background: var(--surface);
+  padding: 26px 28px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  cursor: pointer;
+}
+.welcome-dropzone-copy {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.welcome-dropzone-copy strong {
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+}
+.welcome-dropzone-copy span {
+  color: var(--muted);
+  font-size: 13px;
+}
+.welcome-converters {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* ============================================================
+   Sealdesk full pass — right panel markup, home quick actions,
+   and dialog/section polish (single Azure system)
+   ============================================================ */
+
+/* Right panel — Markup tools grid */
+.right-panel-markup {
+  padding: 16px 16px 0;
+}
+.right-panel-markup h2 {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.1px;
+  margin-bottom: 10px;
+}
+.markup-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.markup-grid button {
+  height: 52px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--text);
+  box-shadow: 0 1px 0 rgba(21, 54, 125, 0.05);
+}
+.markup-grid button svg {
+  color: var(--green);
+}
+.markup-grid button:hover {
+  border-color: var(--green);
+}
+.markup-grid button.selected {
+  background: var(--green);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 2px 10px rgba(21, 96, 232, 0.28);
+}
+.markup-grid button.selected svg {
+  color: #fff;
+}
+.right-panel-foot {
+  margin-top: auto;
+  padding: 14px 16px 18px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.right-panel-foot .primary {
+  justify-content: center;
+}
+.right-panel-foot .text-button {
+  justify-content: center;
+}
+
+/* Home — Quick actions column */
+.welcome-quick {
+  width: 280px;
+  min-width: 280px;
+  background: var(--panel);
+  border-left: 1px solid var(--line);
+  padding: 26px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+}
+.welcome-quick h2 {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.2px;
+  padding: 0 4px;
+}
+.welcome-quick > button {
+  min-height: 84px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  text-align: left;
+  box-shadow:
+    0 1px 0 rgba(21, 54, 125, 0.05),
+    0 6px 16px rgba(21, 54, 125, 0.06);
+}
+.welcome-quick > button:hover {
+  border-color: var(--green);
+}
+.quick-icon {
+  width: 40px;
+  height: 40px;
+  min-width: 40px;
+  border-radius: 12px;
+  background: var(--green-soft);
+  color: var(--green);
+  display: grid;
+  place-items: center;
+}
+.quick-label {
+  flex: 1;
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+}
+.welcome-quick > button > svg:last-child {
+  color: var(--muted);
+}
+
+/* Annotation cards */
+.note-card {
+  border-radius: 14px;
+  box-shadow:
+    0 1px 0 rgba(21, 54, 125, 0.05),
+    0 4px 12px rgba(21, 54, 125, 0.05);
+}
+.note-type {
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+}
+.note-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Search results */
+.search-field {
+  border-radius: 10px;
+}
+.search-field input {
+  font-family: "DM Sans", -apple-system, sans-serif;
+}
+.search-result b {
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+}
+
+/* Outline */
+.outline-item {
+  border-radius: 8px;
+}
+.outline-item:hover {
+  background: var(--soft);
+}
+
+/* Tool config + notes */
+.tool-grid label {
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+  font-weight: 600;
+}
+.tool-note {
+  border-radius: 10px;
+}
+.tool-note strong {
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+}
+
+/* Signature + markup tabs */
+.signature-tabs,
+.markup-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 3px;
+}
+.signature-tabs button,
+.markup-tabs button {
+  flex: 1;
+  border-radius: 8px;
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+  font-weight: 600;
+}
+.signature-tabs button[aria-selected="true"],
+.markup-tabs button[aria-selected="true"] {
+  background: var(--surface);
+  color: var(--green);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* Annotation editor rows */
+.editor-style-row,
+.editor-weight,
+.editor-background {
+  border-radius: 10px;
+}
+.editor-note textarea {
+  border-radius: 9px;
+}
+
+/* Detail + privacy + errors */
+.document-metadata dt {
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+  font-weight: 600;
+}
+.details-privacy {
+  border-radius: 10px;
+}
+.modal-error {
+  border-radius: 10px;
+}
+.toast,
+.error-banner,
+.busy-indicator {
+  border-radius: 14px;
+}
+
+/* Context toolbar controls */
+.context-toolbar select {
+  font-family: "DM Sans", -apple-system, sans-serif;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 8px;
+  margin: 0 6px;
+}
+
+/* Organize cards */
+.page-card {
+  border-radius: 12px;
+}
+.organizer-heading h1 {
+  font-weight: 800;
+  letter-spacing: -0.8px;
+}
+
+/* ============================================================
+   Shared modal polish (all dialogs)
+   ============================================================ */
+.modal {
+  border-radius: 20px;
+  padding: 28px;
+}
+.modal h2 {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+}
+.modal textarea,
+.modal input {
+  border-radius: 10px;
+}
+.modal label {
+  font-size: 12px;
+  font-weight: 600;
+}
+.modal small {
+  font-size: 11px;
+}
+.modal-actions {
+  gap: 10px;
+}
+.copy-text-button {
+  border-radius: 10px;
+  height: 34px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.markdown-preview {
+  border-radius: 12px;
 }

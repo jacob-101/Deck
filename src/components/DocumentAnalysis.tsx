@@ -1,15 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { PdfProcessResult } from "@firecrawl/pdf-inspector-wasm";
-import {
-  Check,
-  ChevronRight,
-  Copy,
-  Download,
-  FileSearch,
-  ScanText,
-  ShieldCheck,
-  X,
-} from "lucide-react";
+import { Check, Copy, Download, ScanText, X } from "lucide-react";
+import { AnalysisText } from "./AnalysisText";
 import { analyzePDF } from "../core/inspector";
 import { IconButton } from "./Button";
 import type { OCRResult } from "../types";
@@ -40,7 +32,7 @@ export function DocumentAnalysis({
   const [ocrBusy, setOcrBusy] = useState(false);
   const [language, setLanguage] = useState("auto");
   const [copied, setCopied] = useState(false);
-  const [findingsOpen, setFindingsOpen] = useState(true);
+  const [view, setView] = useState<"text" | "ocr" | "details">("text");
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
@@ -49,7 +41,7 @@ export function DocumentAnalysis({
     setResult(null);
     setError("");
     setNotice("");
-    setFindingsOpen(true);
+    setView("text");
     void analyzePDF(bytes, controller.signal)
       .then(setResult)
       .catch((cause) => {
@@ -57,9 +49,6 @@ export function DocumentAnalysis({
       });
     return () => controller.abort();
   }, [bytes, attempt]);
-  useEffect(() => {
-    if (ocr) setFindingsOpen(false);
-  }, [ocr]);
   const markdown =
     ocr && result
       ? mergeOCRMarkdown(result.markdown || "", ocr, result.pageCount)
@@ -126,6 +115,7 @@ export function DocumentAnalysis({
     try {
       const value = await window.desktop.runOCR(bytes, targets, language);
       setOcr(value);
+      setView("text");
       setNotice(
         `Offline OCR completed for ${value.pages.length} page(s) in ${(value.processingTimeMs / 1000).toFixed(1)} seconds.`,
       );
@@ -148,19 +138,27 @@ export function DocumentAnalysis({
   };
   const pages = (values: number[]) =>
     values.length ? values.join(", ") : "None detected";
+  const views = ["text", "ocr", "details"] as const;
+  const viewLabels = {
+    text: "Text",
+    ocr: "Text recognition",
+    details: "Details",
+  };
   return (
     <dialog
       ref={dialog}
-      className={`modal document-details analysis-dialog ${ocr ? "ocr-complete" : ""}`}
+      className="modal analysis-dialog"
+      data-view={result ? view : "loading"}
       aria-label="Document analysis"
-      onCancel={(e) => {
-        if (saving) e.preventDefault();
+      onCancel={(event) => {
+        if (saving) event.preventDefault();
         else close();
       }}
     >
-      <div className="modal-heading">
-        <div className="modal-icon">
-          <FileSearch size={23} />
+      <header className="analysis-header">
+        <div>
+          <h2>Document analysis</h2>
+          <p title={name}>{name}</p>
         </div>
         <IconButton
           label="Close document analysis"
@@ -169,202 +167,287 @@ export function DocumentAnalysis({
         >
           <X size={18} />
         </IconButton>
-      </div>
-      <span className="inspector-eyebrow">DOCUMENT INTELLIGENCE</span>
-      <h2>Document analysis</h2>
-      <p>{name} · Current PDF revision</p>
-      {!result && !error && (
-        <div className="analysis-progress" role="status">
-          <span className="spinner" /> Analyzing locally… You can close this
-          window to cancel.
-        </div>
-      )}
-      {result && (
-        <>
-          <details
-            className="analysis-findings"
-            open={findingsOpen}
-            onToggle={(event) => setFindingsOpen(event.currentTarget.open)}
+      </header>
+      <div
+        className="analysis-tabs"
+        role="tablist"
+        aria-label="Analysis views"
+        onKeyDown={(event) => {
+          const direction =
+            event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0;
+          if (!direction && event.key !== "Home" && event.key !== "End") return;
+          event.preventDefault();
+          const index =
+            event.key === "Home"
+              ? 0
+              : event.key === "End"
+                ? views.length - 1
+                : (views.indexOf(view) + direction + views.length) %
+                  views.length;
+          setView(views[index]);
+          event.currentTarget
+            .querySelectorAll<HTMLButtonElement>("button")
+            [index]?.focus();
+        }}
+      >
+        {views.map((item) => (
+          <button
+            key={item}
+            role="tab"
+            id={`analysis-tab-${item}`}
+            aria-controls={`analysis-view-${item}`}
+            aria-selected={view === item}
+            tabIndex={view === item ? 0 : -1}
+            onClick={() => setView(item)}
           >
-            <summary>
-              <span>
-                <strong>{labels[result.pdfType] || "Unclassified PDF"}</strong>
-                <small>
-                  {result.pageCount} pages ·{" "}
-                  {Math.round(result.confidence * 100)}% confidence
-                </small>
-              </span>
-              <span className="analysis-findings-action">
-                {ocr ? "Analysis details" : "Document details"}
-                <ChevronRight size={15} />
-              </span>
-            </summary>
-            <dl className="document-metadata">
-              <div>
-                <dt>May need OCR</dt>
-                <dd>{pages(result.pagesNeedingOcr)}</dd>
-              </div>
-              <div>
-                <dt>Tables</dt>
-                <dd>{pages(result.layout.pagesWithTables)}</dd>
-              </div>
-              <div>
-                <dt>Columns</dt>
-                <dd>{pages(result.layout.pagesWithColumns)}</dd>
-              </div>
-              <div>
-                <dt>Text encoding</dt>
-                <dd>
-                  {result.hasEncodingIssues
-                    ? "Review extracted text"
-                    : "No issues detected"}
-                </dd>
-              </div>
-            </dl>
-            <p className="analysis-caveat">
-              Classification is an estimate. Review recognized text before
-              relying on it.
-            </p>
-          </details>
-          <section className="ocr-workflow" aria-labelledby="ocr-title">
-            <div className="ocr-workflow-intro">
-              <div className="ocr-mark" aria-hidden="true">
-                <ScanText size={28} strokeWidth={1.6} />
-                <strong>OCR</strong>
-              </div>
-              <div>
-                <h3 id="ocr-title">Make scanned pages readable</h3>
-                <p>
-                  Turn text inside page images into searchable, copyable text
-                  using Apple Vision on this Mac.
-                </p>
-              </div>
-            </div>
-            <div className="ocr-controls">
-              <label>
-                Recognition language
-                <select
-                  aria-label="OCR language"
-                  value={language}
-                  disabled={ocrBusy}
-                  onChange={(e) => setLanguage(e.target.value)}
-                >
-                  <option value="auto">Automatic / English</option>
-                  <option value="en-US">English</option>
-                  <option value="zh-Hans">Chinese (Simplified)</option>
-                  <option value="zh-Hant">Chinese (Traditional)</option>
-                  <option value="ja-JP">Japanese</option>
-                  <option value="ko-KR">Korean</option>
-                  <option value="fr-FR">French</option>
-                  <option value="de-DE">German</option>
-                  <option value="es-ES">Spanish</option>
-                </select>
-              </label>
-              <button
-                className="primary ocr-run"
-                disabled={
-                  ocrBusy ||
-                  !window.desktop ||
-                  (result.pagesNeedingOcr.length || result.pageCount) > 100
-                }
-                onClick={() => void runOCR(false)}
-              >
-                {ocrBusy ? (
-                  <>
-                    <span className="spinner" /> Recognizing…
-                  </>
-                ) : (
-                  <>
-                    <ScanText size={16} />
-                    {`Run Offline OCR${result.pagesNeedingOcr.length ? ` · ${result.pagesNeedingOcr.length} suggested` : ""}`}
-                  </>
-                )}
-              </button>
-              {result.pagesNeedingOcr.length > 0 &&
-                result.pagesNeedingOcr.length < result.pageCount && (
-                  <button
-                    className="secondary"
-                    disabled={ocrBusy || result.pageCount > 100}
-                    onClick={() => void runOCR(true)}
-                  >
-                    OCR all pages
-                  </button>
-                )}
-              {ocrBusy && (
-                <button
-                  className="secondary"
-                  onClick={() => window.desktop?.cancelOCR()}
-                >
-                  Cancel OCR
-                </button>
-              )}
-            </div>
-          </section>
-          {ocr && (
-            <div className="analysis-summary">
-              <strong>{ocr.engine} OCR complete</strong>
-              <span>
-                Average confidence{" "}
-                {Math.round(
-                  (ocr.pages.reduce((sum, page) => sum + page.confidence, 0) /
-                    Math.max(1, ocr.pages.length)) *
-                    100,
-                )}
-                % · Markdown now uses recognized text
-              </span>
-            </div>
-          )}
-          {markdown ? (
-            <>
-              <div className="markdown-heading">
-                <label htmlFor="markdown-preview">
-                  {ocr ? "Recognized text" : "Extracted text"}
-                </label>
+            {viewLabels[item]}
+            {item === "ocr" && ocrBusy && (
+              <span className="spinner" aria-label="OCR running" />
+            )}
+          </button>
+        ))}
+      </div>
+      <div className="analysis-body">
+        {!result && !error && (
+          <div className="analysis-progress" role="status">
+            <span className="spinner" /> Analyzing document…
+          </div>
+        )}
+        {result && (
+          <>
+            <section
+              className="analysis-text analysis-view"
+              role="tabpanel"
+              id="analysis-view-text"
+              aria-labelledby="analysis-tab-text"
+              hidden={view !== "text"}
+            >
+              <div className="analysis-text-tools">
+                <span>{ocr ? "Recognized text" : "Extracted text"}</span>
                 <button
                   className={`copy-text-button ${copied ? "copied" : ""}`}
+                  disabled={!markdown}
                   onClick={() => void copyRecognizedText()}
                   aria-label={ocr ? "Copy OCR text" : "Copy extracted text"}
                 >
                   {copied ? <Check size={14} /> : <Copy size={14} />}
-                  {copied ? "Copied" : ocr ? "Copy OCR text" : "Copy text"}
+                  {copied ? "Copied" : "Copy text"}
                 </button>
               </div>
-              <pre
-                id="markdown-preview"
-                className="markdown-preview"
-                tabIndex={0}
-              >
-                {markdown.slice(0, 30000)}
-              </pre>
+              {markdown ? (
+                <AnalysisText markdown={markdown} />
+              ) : (
+                <div className="analysis-no-text">
+                  <ScanText size={24} />
+                  <h3>No text extracted</h3>
+                  <p>Use text recognition to read scanned pages.</p>
+                  <button className="secondary" onClick={() => setView("ocr")}>
+                    Set up OCR
+                  </button>
+                </div>
+              )}
               {markdown.length > 30000 && (
-                <p>
-                  Preview limited to 30,000 characters. Export includes all
-                  extracted text.
+                <p className="analysis-preview-limit">
+                  Showing the first 30,000 characters. Copy and export include
+                  all text.
                 </p>
               )}
-            </>
-          ) : (
-            <p>
-              No extractable text found. Run offline OCR to recognize scanned
-              pages.
-            </p>
-          )}
-        </>
-      )}
-      {error && <p role="alert">{error}</p>}
-      {!result && error && (
-        <button className="secondary" onClick={() => setAttempt((n) => n + 1)}>
-          Retry analysis
-        </button>
-      )}
-      {notice && <p role="status">{notice}</p>}
-      <div className="details-privacy">
-        <ShieldCheck size={15} />
-        <span>
-          PDF Inspector + Apple Vision OCR · Processed on your Mac. No uploads.
-        </span>
+            </section>
+            <section
+              className="analysis-view analysis-ocr"
+              role="tabpanel"
+              id="analysis-view-ocr"
+              aria-labelledby="analysis-tab-ocr"
+              hidden={view !== "ocr"}
+            >
+              <h3>Recognize scanned text</h3>
+              <p>
+                {result.pagesNeedingOcr.length
+                  ? `${result.pagesNeedingOcr.length} of ${result.pageCount} ${result.pageCount === 1 ? "page is" : "pages are"} suggested for OCR.`
+                  : markdown
+                    ? "This PDF already contains text. Use OCR if the extraction is incomplete."
+                    : "This PDF has no extractable text."}
+              </p>
+              <p className="analysis-ocr-note">
+                Apple Vision runs on your Mac. Results appear in the Text tab.
+              </p>
+              <div className="ocr-controls">
+                <label>
+                  Language
+                  <select
+                    aria-label="OCR language"
+                    value={language}
+                    disabled={ocrBusy}
+                    onChange={(e) => setLanguage(e.target.value)}
+                  >
+                    <option value="auto">Automatic / English</option>
+                    <option value="en-US">English</option>
+                    <option value="zh-Hans">Chinese (Simplified)</option>
+                    <option value="zh-Hant">Chinese (Traditional)</option>
+                    <option value="ja-JP">Japanese</option>
+                    <option value="ko-KR">Korean</option>
+                    <option value="fr-FR">French</option>
+                    <option value="de-DE">German</option>
+                    <option value="es-ES">Spanish</option>
+                  </select>
+                </label>
+                <button
+                  className="primary ocr-run"
+                  disabled={
+                    ocrBusy ||
+                    !window.desktop ||
+                    (result.pagesNeedingOcr.length || result.pageCount) > 100
+                  }
+                  onClick={() => void runOCR(false)}
+                >
+                  {ocrBusy ? (
+                    <>
+                      <span className="spinner" /> Recognizing…
+                    </>
+                  ) : (
+                    <>
+                      <ScanText size={16} />
+                      {`Run OCR${result.pagesNeedingOcr.length ? ` · ${result.pagesNeedingOcr.length} ${result.pagesNeedingOcr.length === 1 ? "page" : "pages"}` : ""}`}
+                    </>
+                  )}
+                </button>
+                {result.pagesNeedingOcr.length > 0 &&
+                  result.pagesNeedingOcr.length < result.pageCount && (
+                    <button
+                      className="secondary"
+                      disabled={ocrBusy || result.pageCount > 100}
+                      onClick={() => void runOCR(true)}
+                    >
+                      OCR all pages
+                    </button>
+                  )}
+                {ocrBusy && (
+                  <button
+                    className="secondary"
+                    onClick={() => window.desktop?.cancelOCR()}
+                  >
+                    Cancel OCR
+                  </button>
+                )}
+              </div>
+              {(result.pagesNeedingOcr.length || result.pageCount) > 100 && (
+                <p className="analysis-preview-limit">
+                  OCR supports up to 100 pages per run. Extract a smaller page
+                  range first.
+                </p>
+              )}
+              {ocr && (
+                <p className="analysis-ocr-result">
+                  Recognized {ocr.pages.length}{" "}
+                  {ocr.pages.length === 1 ? "page" : "pages"} ·{" "}
+                  {Math.round(
+                    (ocr.pages.reduce((sum, page) => sum + page.confidence, 0) /
+                      Math.max(1, ocr.pages.length)) *
+                      100,
+                  )}
+                  % average confidence
+                </p>
+              )}
+              {ocr &&
+                ocr.pages.some((page) => (page.uncertain?.length ?? 0) > 0) && (
+                  <details className="analysis-uncertain" open>
+                    <summary>Flagged for review</summary>
+                    <ul>
+                      {ocr.pages.flatMap((page) =>
+                        (page.uncertain ?? []).map((item) => (
+                          <li key={`${page.page}-${item.text}`}>
+                            <span className="analysis-uncertain-page">
+                              p.{page.page}
+                            </span>
+                            <span>{item.text}</span>
+                            <small>
+                              {Math.round(item.confidence * 100)}%
+                            </small>
+                          </li>
+                        )),
+                      )}
+                    </ul>
+                    <p>
+                      Low-confidence text — especially numbers — may be misread.
+                      Compare against the original page before relying on it.
+                    </p>
+                  </details>
+                )}
+            </section>
+            <section
+              className="analysis-view analysis-details"
+              role="tabpanel"
+              id="analysis-view-details"
+              aria-labelledby="analysis-tab-details"
+              hidden={view !== "details"}
+            >
+              <h3>Document details</h3>
+              <dl>
+                <div>
+                  <dt>PDF type</dt>
+                  <dd>{labels[result.pdfType] || "Unclassified PDF"}</dd>
+                </div>
+                <div>
+                  <dt>Pages</dt>
+                  <dd>{result.pageCount}</dd>
+                </div>
+                <div>
+                  <dt>Classification confidence</dt>
+                  <dd>{Math.round(result.confidence * 100)}%</dd>
+                </div>
+                <div>
+                  <dt>Pages suggested for OCR</dt>
+                  <dd>{pages(result.pagesNeedingOcr)}</dd>
+                </div>
+                <div>
+                  <dt>Pages with tables</dt>
+                  <dd>{pages(result.layout.pagesWithTables)}</dd>
+                </div>
+                <div>
+                  <dt>Pages with columns</dt>
+                  <dd>{pages(result.layout.pagesWithColumns)}</dd>
+                </div>
+                <div>
+                  <dt>Text encoding</dt>
+                  <dd>
+                    {result.hasEncodingIssues
+                      ? "Review extracted text"
+                      : "No issues detected"}
+                  </dd>
+                </div>
+              </dl>
+              <p className="analysis-caveat">
+                Classification is an estimate. Check the extracted text against
+                your PDF.
+              </p>
+            </section>
+          </>
+        )}
+        {error && (
+          <p className="analysis-message" role="alert">
+            {error}
+          </p>
+        )}
+        {!result && error && (
+          <button
+            className="secondary"
+            onClick={() => setAttempt((n) => n + 1)}
+          >
+            Retry analysis
+          </button>
+        )}
+        {notice && (
+          <p className="analysis-message" role="status">
+            {notice}
+          </p>
+        )}
       </div>
-      <div className="modal-actions">
+      <footer className="analysis-footer">
+        <span className="analysis-file-status">
+          {result
+            ? `${result.pageCount} ${result.pageCount === 1 ? "page" : "pages"} · ${labels[result.pdfType] || "Unclassified PDF"}`
+            : "Analyzing…"}
+        </span>
         <button className="secondary" disabled={saving} onClick={close}>
           {result ? "Done" : "Cancel"}
         </button>
@@ -373,10 +456,9 @@ export function DocumentAnalysis({
           disabled={saving || !markdown}
           onClick={() => void exportMarkdown()}
         >
-          <Download size={15} />
-          {saving ? "Exporting…" : "Export Markdown"}
+          <Download size={15} /> {saving ? "Exporting…" : "Export Markdown"}
         </button>
-      </div>
+      </footer>
     </dialog>
   );
 }

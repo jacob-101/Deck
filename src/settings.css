@@ -1,34 +1,4 @@
-/* Forest & Paper: quiet surfaces, purposeful color, and a document-first hierarchy. */
-:root[data-palette="slate"] {
-  --green: #4e6275;
-  --green-soft: #e5ebf0;
-  --accent: #afc1ce;
-}
-:root[data-palette="cobalt"] {
-  --green: #365db1;
-  --green-soft: #e6ecf9;
-  --accent: #aebfe3;
-}
-:root[data-palette="clay"] {
-  --green: #9b563f;
-  --green-soft: #f2e8e1;
-  --accent: #d6b7a7;
-}
-:root[data-theme="dark"][data-palette="slate"] {
-  --green: #b5cbdc;
-  --green-soft: #384853;
-  --accent: #718896;
-}
-:root[data-theme="dark"][data-palette="cobalt"] {
-  --green: #afc6ff;
-  --green-soft: #344361;
-  --accent: #6c87b8;
-}
-:root[data-theme="dark"][data-palette="clay"] {
-  --green: #eac0aa;
-  --green-soft: #554039;
-  --accent: #a5826c;
-}
+/* Settings layout. Shared theme values and component shapes live in design-system.css. */
 .product-icon {
   display: block;
   flex-shrink: 0;
@@ -695,4 +665,381 @@
   .settings-scroll {
     padding-top: 22px;
   }
+}
+
+/* ============================================================
+   Settings — Sealdesk Azure system (single source of truth)
+   Colors: bg #F3F7FE · panel #EEF4FD · surface #FFFFFF ·
+   navy text #0F1F44 · primary #1560E8 · accent #B3CDF6
+   Fonts: Plus Jakarta Sans (headings/labels) · DM Sans (body)
+   ============================================================ */
+.settings-dialog {
+  border-radius: 18px;
+  background: var(--panel);
+  box-shadow:
+    0 30px 100px rgba(15, 35, 88, 0.28),
+    0 4px 18px rgba(21, 54, 125, 0.12);
+}
+.settings-shell {
+  grid-template-columns: 210px minmax(0, 1fr);
+}
+.settings-sidebar {
+  background: #0f2358;
+  border-right: 1px solid #1e3370;
+  padding: 24px 14px 18px;
+}
+.settings-brand strong {
+  color: #ffffff;
+  font-family:
+    "Plus Jakarta Sans",
+    "DM Sans",
+    -apple-system,
+    sans-serif;
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+.settings-brand span {
+  color: #9db0d8;
+  letter-spacing: 2.8px;
+}
+.settings-label {
+  color: #9db0d8;
+}
+.settings-sidebar nav button {
+  border-radius: 13px;
+  color: #c7d5f2;
+  font-family:
+    "Plus Jakarta Sans",
+    "DM Sans",
+    -apple-system,
+    sans-serif;
+  font-weight: 600;
+}
+.settings-sidebar nav button:hover {
+  background: #1e3370;
+  color: #ffffff;
+}
+.settings-sidebar nav button.active {
+  background: #ffffff;
+  color: #0f2358;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+  font-weight: 700;
+}
+.settings-sidebar-foot {
+  color: #9db0d8;
+}
+.settings-main {
+  background: var(--panel);
+}
+.settings-titlebar > span {
+  font-family:
+    "Plus Jakarta Sans",
+    "DM Sans",
+    -apple-system,
+    sans-serif;
+  font-weight: 600;
+}
+.settings-heading h2 {
+  font-family:
+    "Plus Jakarta Sans",
+    "DM Sans",
+    -apple-system,
+    sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.7px;
+}
+.settings-heading p {
+  font-size: 12px;
+}
+.setting-group-title {
+  font-family:
+    "Plus Jakarta Sans",
+    "DM Sans",
+    -apple-system,
+    sans-serif;
+  color: var(--muted);
+}
+.setting-group {
+  border-radius: 14px;
+  box-shadow:
+    0 1px 0 rgba(21, 54, 125, 0.06),
+    0 6px 16px rgba(21, 54, 125, 0.06);
+}
+.setting-row strong,
+.reset-settings strong {
+  font-family:
+    "Plus Jakarta Sans",
+    "DM Sans",
+    -apple-system,
+    sans-serif;
+  font-weight: 700;
+}
+.setting-row select {
+  border-radius: 9px;
+  background: var(--surface);
+  font-family:
+    "DM Sans",
+    -apple-system,
+    sans-serif;
+}
+.setting-toggle[aria-checked="true"] {
+  background: var(--green);
+}
+.shortcut-grid kbd {
+  font-family:
+    "DM Sans",
+    -apple-system,
+    sans-serif;
+}
+.settings-callout {
+  border-radius: 12px;
+}
+.appearance-options > button {
+  border-radius: 12px;
+}
+.theme-options {
+  grid-template-columns: repeat(5, 1fr);
+}
+.theme-options button {
+  border-radius: 12px;
+  font-family:
+    "Plus Jakarta Sans",
+    "DM Sans",
+    -apple-system,
+    sans-serif;
+}
+.annotation-preview {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow:
+    0 1px 0 rgba(21, 54, 125, 0.06),
+    0 6px 16px rgba(21, 54, 125, 0.06);
+}
+.preview-label {
+  color: var(--muted);
+  font-family:
+    "Plus Jakarta Sans",
+    "DM Sans",
+    -apple-system,
+    sans-serif;
+  font-weight: 700;
+}
+.annotation-preview > div {
+  font-family:
+    "Plus Jakarta Sans",
+    "DM Sans",
+    -apple-system,
+    sans-serif;
+  font-size: 22px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+}
+.privacy-hero {
+  border-radius: 14px;
+}
+.privacy-hero strong {
+  font-family:
+    "Plus Jakarta Sans",
+    "DM Sans",
+    -apple-system,
+    sans-serif;
+}
+.about-product h3 {
+  font-family:
+    "Plus Jakarta Sans",
+    "DM Sans",
+    -apple-system,
+    sans-serif;
+  font-weight: 800;
+}
+.settings-footer {
+  border-bottom-left-radius: 18px;
+  border-bottom-right-radius: 18px;
+}
+.settings-footer .primary {
+  border-radius: 11px;
+}
+:root[data-theme="dark"] .settings-sidebar {
+  background: #0c1e4e;
+  border-right-color: #1e3370;
+}
+
+/* ============================================================
+   Settings polish — real hierarchy, real controls
+   (layout/typography; color stays token-driven)
+   ============================================================ */
+.settings-dialog {
+  width: min(880px, calc(100vw - 64px));
+  height: min(680px, calc(100dvh - 64px));
+  border-radius: 20px;
+  box-shadow:
+    0 40px 100px rgba(15, 35, 88, 0.3),
+    0 4px 18px rgba(21, 54, 125, 0.12);
+}
+.settings-dialog::backdrop {
+  background: rgba(15, 35, 88, 0.45);
+  backdrop-filter: blur(8px);
+}
+.settings-shell {
+  grid-template-columns: 216px minmax(0, 1fr);
+}
+.settings-brand strong {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.4px;
+}
+.settings-sidebar nav button {
+  min-height: 46px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+.settings-titlebar {
+  min-height: 60px;
+  padding: 13px 20px 11px 28px;
+}
+.settings-titlebar > span {
+  font-size: 12px;
+}
+.settings-heading h2 {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+}
+.settings-heading p {
+  font-size: 13px;
+  line-height: 1.6;
+}
+.setting-group-title {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+}
+.setting-group {
+  border-radius: 14px;
+  box-shadow:
+    0 1px 0 rgba(21, 54, 125, 0.06),
+    0 6px 16px rgba(21, 54, 125, 0.06);
+}
+.setting-row {
+  padding: 18px;
+}
+.setting-row strong,
+.reset-settings strong {
+  font-size: 13px;
+  font-weight: 700;
+}
+.setting-row p,
+.reset-settings p {
+  font-size: 12px;
+  max-width: 320px;
+}
+.setting-row select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 38px;
+  min-width: 132px;
+  border-radius: 10px;
+  padding: 0 34px 0 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%231560E8' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 11px center;
+  cursor: pointer;
+}
+:root[data-theme="dark"] .setting-row select {
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%234E8CFF' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 11px center;
+}
+.setting-row .secondary {
+  height: 36px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0 14px;
+}
+.setting-toggle {
+  width: 36px;
+  height: 22px;
+  padding: 3px;
+}
+.setting-toggle span {
+  width: 16px;
+  height: 16px;
+}
+.setting-toggle[aria-checked="true"] span {
+  transform: translateX(14px);
+}
+.shortcut-grid > div {
+  min-height: 42px;
+  font-size: 12px;
+  padding: 10px 0;
+}
+.shortcut-grid kbd {
+  font-family: "DM Sans", -apple-system, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  background: var(--soft);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+.settings-callout {
+  background: var(--soft);
+  border-radius: 12px;
+  padding: 13px 15px;
+  margin-top: 18px;
+  align-items: flex-start;
+}
+.settings-callout p {
+  font-size: 12px;
+  line-height: 1.6;
+}
+.appearance-options > button {
+  border-radius: 12px;
+}
+.theme-options {
+  grid-template-columns: repeat(5, 1fr);
+}
+.theme-options button {
+  border-radius: 12px;
+  font-size: 10px;
+}
+.settings-footer {
+  min-height: 64px;
+  padding: 12px 24px;
+}
+.settings-footer .primary {
+  height: 40px;
+  min-width: 84px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.settings-footer > span {
+  font-size: 11px;
+}
+.privacy-hero {
+  border-radius: 14px;
+  align-items: center;
+}
+.privacy-facts strong {
+  font-size: 12px;
+}
+.privacy-facts p {
+  font-size: 12px;
+}
+.about-product h3 {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: -0.8px;
+}
+.reset-settings .text-button {
+  height: 36px;
+  border-radius: 10px;
+  font-size: 12px;
 }

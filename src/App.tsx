@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   getDocument,
   GlobalWorkerOptions,
@@ -23,6 +30,7 @@ import {
   Circle,
   Copy,
   Download,
+  Eraser,
   FilePlus2,
   FileOutput,
   FileText,
@@ -89,13 +97,18 @@ import {
 } from "./core/preferences";
 import { Settings, type SettingsSection } from "./components/Settings";
 import { APP_VERSION, BrandIcon } from "./components/Brand";
+import { ThemeArtwork, type ThemeArtworkName } from "./components/ThemeArtwork";
 import { AnnotationEditor } from "./components/AnnotationEditor";
 import {
   SignatureModal,
   type SignatureResult,
 } from "./components/SignatureModal";
 import { DocumentDetails } from "./components/DocumentDetails";
-import { DocumentAnalysis } from "./components/DocumentAnalysis";
+const DocumentAnalysis = lazy(() =>
+  import("./components/DocumentAnalysis").then((module) => ({
+    default: module.DocumentAnalysis,
+  })),
+);
 import { ImagePDFEditor } from "./components/ImagePDFEditor";
 import { DocumentOutline } from "./components/DocumentOutline";
 import { PDFTools } from "./components/PDFTools";
@@ -176,6 +189,12 @@ const tools: {
     icon: PenTool,
     hint: "Click to create and place a visible signature.",
   },
+  {
+    id: "Redact",
+    label: "Redact",
+    icon: Eraser,
+    hint: "Drag over text to permanently remove it.",
+  },
 ];
 const colors = ANNOTATION_COLORS;
 const download = (bytes: Uint8Array, name: string) => {
@@ -248,6 +267,7 @@ export default function App() {
   const [imageEditor, setImageEditor] = useState<ImageFile[] | null>(null);
   const [toolsOpen, setToolsOpen] = useState<
     | null
+    | "compress"
     | "split"
     | "mix"
     | "sheet"
@@ -778,7 +798,6 @@ export default function App() {
       imageBytes: sig.imageBytes,
     });
     setTool("select");
-    setTab("notes");
     notify("Signature placed on page. Drag to reposition or resize.");
   };
   const handleUpdateAnnotationRect = useCallback(
@@ -1262,6 +1281,23 @@ export default function App() {
       await loadFile(file);
       setToolsOpen(tool);
     });
+  const openWorkspaceWithPDF = (
+    action: "annotate" | "organize" | "signature" | "analysis",
+  ) =>
+    void perform("Opening PDF…", async () => {
+      if (!window.desktop) {
+        chooseFile();
+        return;
+      }
+      const file = await window.desktop.open();
+      if (!file) return;
+      await loadFile(file);
+      if (action === "analysis") setAnalysis(true);
+      else {
+        setMode(action === "organize" ? "organize" : "annotate");
+        if (action === "signature") setSignatureModalOpen(true);
+      }
+    });
   const chooseProtectedPDF = () =>
     void perform("Opening protected PDF…", async () => {
       if (!window.desktop)
@@ -1472,6 +1508,10 @@ export default function App() {
                     label: "Text, notes and signatures",
                     ids: ["FreeText", "Text", "Stamp"],
                   },
+                  {
+                    label: "Redact",
+                    ids: ["Redact"],
+                  },
                 ].map((group) => (
                   <div
                     className="annotation-tool-group"
@@ -1604,10 +1644,10 @@ export default function App() {
                         aria-label={
                           item === "search"
                             ? "Search document"
-                            : item === "notes"
-                              ? "Annotations"
-                              : item === "contents"
-                                ? "Table of contents"
+                            : item === "contents"
+                              ? "Table of contents"
+                              : item === "notes"
+                                ? "Annotations"
                                 : "Pages"
                         }
                       >
@@ -1766,13 +1806,14 @@ export default function App() {
                 ) : (
                   <div className="notes-panel">
                     {revision.info.pages.every(
-                      (page) => !page.annotations.length,
+                      (pageInfo) => !pageInfo.annotations.length,
                     ) ? (
                       <div className="empty-notes">
                         <MessageSquare size={25} />
-                        <h3>A little room for thought.</h3>
+                        <h3>No annotations yet.</h3>
                         <p>
-                          Your highlights, notes, and drawings will appear here.
+                          Highlight text or add a note, and it will show up
+                          here.
                         </p>
                         <button
                           className="text-button"
@@ -2053,31 +2094,124 @@ export default function App() {
         </>
       ) : (
         <main className="welcome">
-          <div className="welcome-content">
-            <div className="welcome-copy">
-              <div className="welcome-identity">
-                <BrandIcon size={62} />
-                <span>
-                  OPENPDF STUDIO<small>A little more room to work.</small>
-                </span>
-              </div>
-              <h1>
-                Your PDFs.
-                <br />
-                <em>On your terms.</em>
-              </h1>
-              <p>
-                A thoughtful space to read, annotate, and bring your documents
-                together. No accounts. No uploads. Just you and the page.
-              </p>
-              <button
-                className="primary open-large"
-                disabled={!!busy}
-                onClick={() => chooseFile()}
-              >
-                <FolderOpen size={19} /> Open a PDF <kbd>⌘ O</kbd>
+          <aside className="welcome-nav">
+            <div className="welcome-nav-brand">
+              <BrandIcon size={30} />
+              <span>OpenPDF</span>
+            </div>
+            <nav aria-label="Home">
+              <button className="active" aria-current="page">
+                <Grid2X2 size={20} />
+                <span>Home</span>
+                <i className="nav-current" />
               </button>
-              <span className="drop-hint">or drop a document anywhere</span>
+              <button disabled={!!busy} onClick={() => chooseFile()}>
+                <FolderOpen size={20} />
+                <span>Open PDF</span>
+              </button>
+              <button
+                disabled={!!busy}
+                onClick={() => openWorkspaceWithPDF("annotate")}
+              >
+                <PenLine size={20} />
+                <span>Edit &amp; annotate</span>
+              </button>
+              <button
+                disabled={!!busy}
+                onClick={() => openToolWithPDF("split")}
+              >
+                <Braces size={20} />
+                <span>PDF Tools</span>
+              </button>
+              <button
+                disabled={!!busy}
+                onClick={() => openWorkspaceWithPDF("analysis")}
+              >
+                <FileSearch size={20} />
+                <span>Scan &amp; OCR</span>
+              </button>
+              <button
+                disabled={!!busy}
+                onClick={() => openWorkspaceWithPDF("organize")}
+              >
+                <Grid2X2 size={20} />
+                <span>Organize pages</span>
+              </button>
+              <div className="welcome-nav-divider" />
+              <button disabled={!!busy} onClick={() => setSettings("general")}>
+                <Settings2 size={20} />
+                <span>Settings</span>
+              </button>
+            </nav>
+          </aside>
+
+          <div className="welcome-body">
+            <div className="welcome-heading">
+              <h1>Welcome back</h1>
+              <p>
+                Open a PDF below, or pick up where you left off. Everything
+                stays on your Mac.
+              </p>
+            </div>
+
+            <section className="welcome-dropzone" aria-label="Open a document">
+              <ThemeArtwork name="document" />
+              <div className="welcome-dropzone-copy">
+                <strong>Drag &amp; drop a document to start</strong>
+                <button
+                  className="primary"
+                  disabled={!!busy}
+                  onClick={() => chooseFile()}
+                >
+                  Choose File
+                </button>
+                <span>PDF, images, or Word — converted locally</span>
+              </div>
+              <ThemeArtwork name="scan" />
+            </section>
+
+            <div className="welcome-section-title">
+              <h2>{"Recent documents"}</h2>
+              {recents.length ? <span>Pick up where you left off</span> : null}
+            </div>
+            {recents.length ? (
+              <div className="recent-list">
+                {recents.slice(0, 4).map((file) => (
+                  <button
+                    key={file.id}
+                    disabled={!!busy}
+                    onClick={() =>
+                      void perform("Opening recent PDF…", async () =>
+                        loadFile(await window.desktop!.openRecent(file.id)),
+                      )
+                    }
+                  >
+                    <div className="recent-file-icon">
+                      <ThemeArtwork name="recent" />
+                    </div>
+                    <div>
+                      <strong>{file.name}</strong>
+                      <span>
+                        {new Date(file.date).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                        })}
+                      </span>
+                    </div>
+                    <ArrowUpRight size={15} />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="recent-empty">
+                Your recent documents will appear here.
+              </div>
+            )}
+
+            <details className="welcome-conversion-section">
+              <summary>
+                Convert &amp; create <ChevronDown size={18} />
+              </summary>
               <div className="welcome-converters" aria-label="Convert to PDF">
                 <button disabled={!!busy} onClick={convertImages}>
                   <FilePlus2 size={17} />
@@ -2147,130 +2281,69 @@ export default function App() {
                   </span>
                 </button>
               </div>
-              <button
-                className="sample-button"
-                disabled={!!busy}
-                onClick={() =>
-                  void perform("Creating sample PDF…", async () => {
-                    const result = await pdfEngine.sample();
-                    openDocument(
-                      result.bytes,
-                      result.info,
-                      "Field Notes.pdf",
-                      null,
-                    );
-                  })
-                }
-              >
-                Take a look around <ArrowUpRight size={15} />
-                <span>Open a sample document</span>
+            </details>
+
+            <button
+              className="sample-button"
+              disabled={!!busy}
+              onClick={() =>
+                void perform("Creating sample PDF…", async () => {
+                  const result = await pdfEngine.sample();
+                  openDocument(
+                    result.bytes,
+                    result.info,
+                    "Field Notes.pdf",
+                    null,
+                  );
+                })
+              }
+            >
+              Take a look around <ArrowUpRight size={15} />
+              <span>Open a sample document</span>
+            </button>
+          </div>
+          <aside className="welcome-quick" aria-label="Quick actions">
+            <h2>Quick Actions</h2>
+            {(
+              [
+                {
+                  label: "Sign a PDF",
+                  artwork: "signature",
+                  run: () => openWorkspaceWithPDF("signature"),
+                },
+                {
+                  label: "Edit PDF",
+                  artwork: "edit",
+                  run: () => openWorkspaceWithPDF("annotate"),
+                },
+                {
+                  label: "Scan & OCR",
+                  artwork: "ocr",
+                  run: () => openWorkspaceWithPDF("analysis"),
+                },
+                {
+                  label: "Compress PDF",
+                  artwork: "compress",
+                  run: () => openToolWithPDF("compress"),
+                },
+                { label: "Images to PDF", artwork: "scan", run: convertImages },
+              ] satisfies {
+                label: string;
+                artwork: ThemeArtworkName;
+                run: () => void;
+              }[]
+            ).map(({ label, artwork, run }) => (
+              <button key={label} disabled={!!busy} onClick={run}>
+                <span className="quick-copy">
+                  <span className="quick-label">{label}</span>
+                  <span className="quick-arrow">
+                    <ChevronRight size={16} />
+                  </span>
+                </span>
+                <ThemeArtwork name={artwork} />
               </button>
-            </div>
-            <div className="welcome-art" aria-hidden="true">
-              <div className="paper-back" />
-              <div className="paper-front">
-                <div className="paper-top">
-                  <span>FIELD NOTES</span>
-                  <span>01 / 04</span>
-                </div>
-                <div className="paper-title">
-                  A little less
-                  <br />
-                  friction.
-                  <br />
-                  <em>
-                    A little more
-                    <br />
-                    focus.
-                  </em>
-                </div>
-                <div className="paper-rule" />
-                <div className="fake-lines">
-                  <i />
-                  <i />
-                  <i />
-                </div>
-                <div className="paper-annotation">
-                  good things
-                  <br />
-                  start here <ArrowUpRight size={25} />
-                </div>
-                <div className="paper-foot">A FRESH PERSPECTIVE</div>
-              </div>
-              <div className="art-label">
-                <ShieldCheck size={16} />
-                <span>Stays on your Mac.</span>
-              </div>
-            </div>
-          </div>
-          <div className="welcome-bottom">
-            {recents.length ? (
-              <div className="recent-section">
-                <div className="recent-header">
-                  <h2>Pick up where you left off</h2>
-                  <span>Recent documents</span>
-                </div>
-                <div className="recent-list">
-                  {recents.slice(0, 3).map((file) => (
-                    <button
-                      key={file.id}
-                      disabled={!!busy}
-                      onClick={() =>
-                        void perform("Opening recent PDF…", async () =>
-                          loadFile(await window.desktop!.openRecent(file.id)),
-                        )
-                      }
-                    >
-                      <div className="recent-file-icon">
-                        <FileText size={20} />
-                      </div>
-                      <div>
-                        <strong>{file.name}</strong>
-                        <span>
-                          {new Date(file.date).toLocaleDateString(undefined, {
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </span>
-                      </div>
-                      <ArrowUpRight size={15} />
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="feature-strip">
-                <div>
-                  <FileText size={19} />
-                  <span>
-                    <strong>Read without distractions</strong>
-                    <small>Search, select, and find your focus.</small>
-                  </span>
-                </div>
-                <div>
-                  <PenLine size={19} />
-                  <span>
-                    <strong>Make your mark</strong>
-                    <small>Highlights, drawings, and little notes.</small>
-                  </span>
-                </div>
-                <div>
-                  <Grid2X2 size={19} />
-                  <span>
-                    <strong>Bring it all together</strong>
-                    <small>Arrange, merge, and split your pages.</small>
-                  </span>
-                </div>
-              </div>
-            )}
-            <div className="welcome-footer">
-              <span>OPEN SOURCE. OPEN POSSIBILITIES.</span>
-              <span>
-                Made for your Mac <span className="footer-dot">·</span> Version{" "}
-                {APP_VERSION}
-              </span>
-            </div>
-          </div>
+            ))}
+          </aside>
         </main>
       )}
       {editor && (
@@ -2293,11 +2366,13 @@ export default function App() {
         />
       )}
       {analysis && revision && (
-        <DocumentAnalysis
-          bytes={revision.bytes}
-          name={state.name}
-          onClose={() => setAnalysis(false)}
-        />
+        <Suspense fallback={null}>
+          <DocumentAnalysis
+            bytes={revision.bytes}
+            name={state.name}
+            onClose={() => setAnalysis(false)}
+          />
+        </Suspense>
       )}
       {settings && (
         <Settings

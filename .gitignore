@@ -11,3 +11,5 @@ test-results/
 build/native/
 native-rust/target/
 *.log
+.playwright-cli/
+output/

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
-export const PREFERENCES_KEY = "openpdf:preferences:v1";
+export const PREFERENCES_KEY = "openpdf:preferences:v2";
+const LEGACY_PREFERENCES_KEY = "openpdf:preferences:v1";
 export const SAVED_SIGNATURES_KEY = "openpdf:signatures:v1";
 
 export const ANNOTATION_COLORS = [
@@ -54,6 +55,12 @@ export const TEXT_BACKGROUND_NAMES = [
 ];
 
 export const THEMES = [
+  {
+    id: "azure",
+    name: "Azure",
+    description: "Confident blue, built for focus.",
+    color: "#1560e8",
+  },
   {
     id: "forest",
     name: "Forest & Paper",
@@ -170,8 +177,8 @@ export type Preferences = {
 };
 
 export const DEFAULT_PREFERENCES: Preferences = {
-  appearance: "system",
-  theme: "forest",
+  appearance: "light",
+  theme: "azure",
   defaultFit: "page",
   showSidebar: true,
   annotationColor: ANNOTATION_COLORS[0],
@@ -226,6 +233,13 @@ export function readPreferences(
   try {
     const saved = storage.getItem(PREFERENCES_KEY);
     if (saved) return normalizePreferences(JSON.parse(saved));
+    const legacy = storage.getItem(LEGACY_PREFERENCES_KEY);
+    if (legacy) {
+      const prefs = normalizePreferences(JSON.parse(legacy));
+      // "forest" was the 0.1–0.4 default; "azure" is the new default.
+      if (prefs.theme === "forest") prefs.theme = "azure";
+      return prefs;
+    }
     const old = storage.getItem("openpdf:theme");
     return normalizePreferences(
       old === "light" || old === "dark" ? { appearance: old } : {},

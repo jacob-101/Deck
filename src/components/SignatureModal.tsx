@@ -500,30 +500,11 @@ export function SignatureModal({
       </p>
 
       {/* Tabs */}
-      <div
-        className="signature-tabs"
-        style={{
-          display: "flex",
-          gap: "8px",
-          borderBottom: "1px solid var(--border)",
-          paddingBottom: "10px",
-          marginBottom: "16px",
-        }}
-      >
+      <div className="signature-tabs" aria-label="Signature method">
         {savedList.length > 0 && (
           <button
             type="button"
-            className={`btn-subtle ${tab === "saved" ? "active" : ""}`}
-            style={{
-              padding: "6px 12px",
-              borderRadius: "6px",
-              background:
-                tab === "saved" ? "var(--accent-subtle)" : "transparent",
-              fontWeight: tab === "saved" ? 600 : 400,
-              display: "flex",
-              alignItems: "center",
-              gap: "6px",
-            }}
+            aria-pressed={tab === "saved"}
             onClick={() => setTab("saved")}
           >
             <Bookmark size={15} /> Saved ({savedList.length})
@@ -531,49 +512,21 @@ export function SignatureModal({
         )}
         <button
           type="button"
-          className={`btn-subtle ${tab === "draw" ? "active" : ""}`}
-          style={{
-            padding: "6px 12px",
-            borderRadius: "6px",
-            background: tab === "draw" ? "var(--accent-subtle)" : "transparent",
-            fontWeight: tab === "draw" ? 600 : 400,
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-          }}
+          aria-pressed={tab === "draw"}
           onClick={() => setTab("draw")}
         >
           <PenTool size={15} /> Draw
         </button>
         <button
           type="button"
-          className={`btn-subtle ${tab === "type" ? "active" : ""}`}
-          style={{
-            padding: "6px 12px",
-            borderRadius: "6px",
-            background: tab === "type" ? "var(--accent-subtle)" : "transparent",
-            fontWeight: tab === "type" ? 600 : 400,
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-          }}
+          aria-pressed={tab === "type"}
           onClick={() => setTab("type")}
         >
           <Type size={15} /> Type
         </button>
         <button
           type="button"
-          className={`btn-subtle ${tab === "import" ? "active" : ""}`}
-          style={{
-            padding: "6px 12px",
-            borderRadius: "6px",
-            background:
-              tab === "import" ? "var(--accent-subtle)" : "transparent",
-            fontWeight: tab === "import" ? 600 : 400,
-            display: "flex",
-            alignItems: "center",
-            gap: "6px",
-          }}
+          aria-pressed={tab === "import"}
           onClick={() => setTab("import")}
         >
           <Upload size={15} /> Import
@@ -608,7 +561,7 @@ export function SignatureModal({
                 role="button"
                 tabIndex={0}
                 style={{
-                  border: "1px solid var(--border)",
+                  border: "1px solid var(--line)",
                   borderRadius: "8px",
                   padding: "10px",
                   background: "var(--surface)",
@@ -672,7 +625,7 @@ export function SignatureModal({
         <div>
           <div
             style={{
-              border: "1.5px dashed var(--border)",
+              border: "1.5px dashed var(--line)",
               borderRadius: "8px",
               background: "#ffffff",
               overflow: "hidden",
@@ -703,7 +656,7 @@ export function SignatureModal({
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  color: "#999",
+                  color: "#5b6b8c",
                   pointerEvents: "none",
                   fontSize: "14px",
                 }}
@@ -733,7 +686,7 @@ export function SignatureModal({
                   background: "#1f2421",
                   border:
                     penColor === "#1f2421"
-                      ? "2px solid var(--accent)"
+                      ? "2px solid var(--green)"
                       : "1px solid #ccc",
                   cursor: "pointer",
                 }}
@@ -749,7 +702,7 @@ export function SignatureModal({
                   background: "#1d3557",
                   border:
                     penColor === "#1d3557"
-                      ? "2px solid var(--accent)"
+                      ? "2px solid var(--green)"
                       : "1px solid #ccc",
                   cursor: "pointer",
                 }}
@@ -819,7 +772,7 @@ export function SignatureModal({
               width: "100%",
               padding: "8px 12px",
               borderRadius: "6px",
-              border: "1px solid var(--border)",
+              border: "1px solid var(--line)",
               fontSize: "15px",
               marginBottom: "14px",
             }}
@@ -834,11 +787,11 @@ export function SignatureModal({
                 style={{
                   border:
                     selectedFontIndex === idx
-                      ? "2px solid var(--accent, #365a47)"
-                      : "1px solid var(--border)",
+                      ? "2px solid var(--green)"
+                      : "1px solid var(--line)",
                   borderRadius: "8px",
                   padding: "10px 14px",
-                  background: "#ffffff",
+                  background: "var(--surface)",
                   cursor: "pointer",
                   display: "flex",
                   justifyContent: "space-between",
@@ -853,7 +806,7 @@ export function SignatureModal({
                   style={{
                     font: style.font,
                     fontSize: "24px",
-                    color: "#1f2421",
+                    color: "var(--text)",
                     whiteSpace: "nowrap",
                     overflow: "hidden",
                     textOverflow: "ellipsis",
@@ -881,7 +834,7 @@ export function SignatureModal({
         <div>
           <div
             style={{
-              border: "1.5px dashed var(--border)",
+              border: "1.5px dashed var(--line)",
               borderRadius: "8px",
               padding: "24px",
               textAlign: "center",
@@ -990,7 +943,7 @@ export function SignatureModal({
           marginTop: "16px",
           padding: "10px 12px",
           background: "var(--surface)",
-          border: "1px solid var(--border)",
+          border: "1px solid var(--line)",
           borderRadius: "6px",
           display: "flex",
           gap: "8px",

@@ -434,3 +434,155 @@
   color: var(--green);
   margin-top: 19px;
 }
+
+/* ============================================================
+   Sealdesk redesign — Document Intelligence dialog
+   ============================================================ */
+.analysis-dialog {
+  width: min(720px, calc(100vw - 48px));
+  max-height: min(780px, calc(100dvh - 64px));
+  padding: 28px;
+}
+.analysis-dialog .modal-heading {
+  margin-bottom: 16px;
+}
+.analysis-dialog h2 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.6px;
+}
+.analysis-dialog > p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 8px 0 15px;
+}
+.inspector-eyebrow {
+  font-size: 10px;
+  letter-spacing: 1.6px;
+  margin: 0 0 12px;
+}
+.analysis-findings {
+  margin: 16px 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow:
+    0 1px 0 rgba(21, 54, 125, 0.06),
+    0 6px 18px rgba(21, 54, 125, 0.07);
+}
+.analysis-findings summary {
+  min-height: 68px;
+  padding: 14px 18px;
+}
+.analysis-findings summary strong {
+  font-size: 17px;
+  font-weight: 800;
+}
+.analysis-findings summary small {
+  font-size: 12px;
+}
+.analysis-findings-action {
+  font-size: 11px;
+  font-weight: 600;
+}
+.analysis-dialog .document-metadata {
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  padding: 6px 18px 16px;
+}
+.analysis-dialog .document-metadata > div {
+  background: var(--soft);
+  border-radius: 11px;
+  padding: 11px 13px;
+}
+.analysis-dialog .document-metadata dt {
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.analysis-dialog .document-metadata dd {
+  font-size: 13px;
+  font-weight: 600;
+}
+.analysis-dialog .ocr-workflow {
+  border-radius: 16px;
+}
+.analysis-dialog .ocr-controls .ocr-run {
+  border-radius: 11px;
+}
+.analysis-dialog .markdown-preview {
+  border-radius: 12px;
+  max-height: 220px;
+  padding: 13px;
+}
+.analysis-dialog .analysis-summary {
+  border-radius: 12px;
+}
+
+/* Flagged low-confidence OCR items */
+.analysis-uncertain {
+  margin: 10px 0 0;
+  border: 1px solid #e4b53c;
+  border-radius: 12px;
+  background: #fff8e6;
+  color: #6b4a00;
+  padding: 12px 14px;
+}
+.analysis-uncertain summary {
+  font-family: "Plus Jakarta Sans", "DM Sans", -apple-system, sans-serif;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+}
+.analysis-uncertain summary::-webkit-details-marker {
+  display: none;
+}
+.analysis-uncertain ul {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+}
+.analysis-uncertain li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+}
+.analysis-uncertain li span:nth-child(2) {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.analysis-uncertain li small {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: #86510b;
+}
+.analysis-uncertain-page {
+  flex-shrink: 0;
+  color: #86510b;
+  font-weight: 600;
+  font-size: 11px;
+}
+.analysis-uncertain > p {
+  margin: 10px 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: #86510b;
+}
+:root[data-theme="dark"] .analysis-uncertain {
+  background: #423a28;
+  border-color: #6b5630;
+  color: #f6d582;
+}
+:root[data-theme="dark"] .analysis-uncertain li small,
+:root[data-theme="dark"] .analysis-uncertain-page,
+:root[data-theme="dark"] .analysis-uncertain > p {
+  color: #e9c884;
+}
