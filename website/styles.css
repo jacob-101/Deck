@@ -25,7 +25,7 @@
 }
 
 * { box-sizing: border-box; }
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; scroll-padding-top: 76px; }
 body {
   margin: 0;
   background: var(--bg);
@@ -34,6 +34,7 @@ body {
   font-size: 16px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
 }
 a { color: inherit; text-decoration: none; }
 img { display: block; max-width: 100%; }
@@ -316,11 +317,36 @@ p { margin: 0; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 900px) {
-  .privacy-grid { grid-template-columns: 1fr; }
-  .trust-grid, .features-grid { grid-template-columns: 1fr 1fr; }
+  .container { padding: 0 24px; }
+  .nav { gap: 16px; }
   .nav-links { display: none; }
+  .nav-actions { margin-left: auto; }
+  .privacy-grid { grid-template-columns: 1fr; gap: 40px; }
+  .trust-grid, .features-grid { grid-template-columns: 1fr 1fr; }
+  .section { padding: 64px 0; }
+  .section-head h2 { font-size: 28px; }
 }
 @media (max-width: 600px) {
-  .trust-grid, .features-grid { grid-template-columns: 1fr; }
-  .footer { grid-template-columns: 1fr; }
+  .container { padding: 0 20px; }
+  .section { padding: 52px 0; }
+  .section-head { margin-bottom: 32px; }
+  .section-head h2 { font-size: 26px; }
+  .section-head p { font-size: 15px; }
+  .trust-grid, .features-grid { grid-template-columns: 1fr; gap: 16px; }
+  .features-grid { gap: 14px; }
+  .feature { padding: 24px; }
+  .tool { font-size: 13.5px; padding: 10px 16px; }
+  .download-card { padding: 36px 20px; border-radius: 20px; }
+  .download-card h2 { font-size: 26px; }
+  .download-meta { gap: 16px; margin-top: 24px; }
+  .footer { grid-template-columns: 1fr; gap: 28px; }
+  .footer-bottom { flex-direction: column; text-align: center; }
+  .showcase-frame { border-radius: 14px; }
+  .showcase-frame figcaption { padding: 12px 16px; font-size: 13px; }
+  .hero-cta .btn { width: 100%; max-width: 340px; }
+}
+@media (max-width: 400px) {
+  .btn-download .dl-meta { display: none; }
+  .brand-name { font-size: 19px; }
+  .nav-actions .btn-sm { padding: 9px 14px; font-size: 13px; }
 }
