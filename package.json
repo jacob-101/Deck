@@ -27,7 +27,7 @@
   },
   "build": {
     "appId": "org.openpdf.studio",
-    "productName": "OpenPDF Studio",
+    "productName": "Deck",
     "directories": {
       "output": "release"
     },
@@ -65,6 +65,9 @@
         "role": "Editor"
       }
     ]
+  },
+  "overrides": {
+    "image-size": "2.0.4"
   },
   "dependencies": {
     "@firecrawl/pdf-inspector-wasm": "1.17.0",

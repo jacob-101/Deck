@@ -54,39 +54,6 @@ export const TEXT_BACKGROUND_NAMES = [
   "Blush",
 ];
 
-export const THEMES = [
-  {
-    id: "azure",
-    name: "Azure",
-    description: "Confident blue, built for focus.",
-    color: "#1560e8",
-  },
-  {
-    id: "forest",
-    name: "Forest & Paper",
-    description: "A calmer kind of workspace.",
-    color: "#365a47",
-  },
-  {
-    id: "slate",
-    name: "Slate",
-    description: "Quiet, precise, and focused.",
-    color: "#4e6275",
-  },
-  {
-    id: "cobalt",
-    name: "Cobalt",
-    description: "A little clarity. A little color.",
-    color: "#365db1",
-  },
-  {
-    id: "clay",
-    name: "Clay",
-    description: "Warm tones, fresh perspective.",
-    color: "#9b563f",
-  },
-] as const;
-
 export type SavedSignature = {
   id: string;
   name: string;
@@ -165,7 +132,6 @@ export function clearSavedSignatures(): void {
 
 export type Preferences = {
   appearance: "system" | "light" | "dark";
-  theme: (typeof THEMES)[number]["id"];
   defaultFit: "page" | "width";
   showSidebar: boolean;
   annotationColor: string;
@@ -178,7 +144,6 @@ export type Preferences = {
 
 export const DEFAULT_PREFERENCES: Preferences = {
   appearance: "light",
-  theme: "azure",
   defaultFit: "page",
   showSidebar: true,
   annotationColor: ANNOTATION_COLORS[0],
@@ -199,8 +164,6 @@ export function normalizePreferences(raw: unknown): Preferences {
     ["system", "light", "dark"].includes(value.appearance)
   )
     result.appearance = value.appearance as Preferences["appearance"];
-  if (THEMES.some((t) => t.id === value.theme))
-    result.theme = value.theme as Preferences["theme"];
   if (value.defaultFit === "width" || value.defaultFit === "page")
     result.defaultFit = value.defaultFit;
   if (typeof value.showSidebar === "boolean")
@@ -234,12 +197,7 @@ export function readPreferences(
     const saved = storage.getItem(PREFERENCES_KEY);
     if (saved) return normalizePreferences(JSON.parse(saved));
     const legacy = storage.getItem(LEGACY_PREFERENCES_KEY);
-    if (legacy) {
-      const prefs = normalizePreferences(JSON.parse(legacy));
-      // "forest" was the 0.1–0.4 default; "azure" is the new default.
-      if (prefs.theme === "forest") prefs.theme = "azure";
-      return prefs;
-    }
+    if (legacy) return normalizePreferences(JSON.parse(legacy));
     const old = storage.getItem("openpdf:theme");
     return normalizePreferences(
       old === "light" || old === "dark" ? { appearance: old } : {},

@@ -51,7 +51,7 @@ try {
     if (message.type() === "error") console.log("CONSOLE", message.text());
   });
   await page
-    .getByRole("heading", { name: "Your PDFs. On your terms." })
+    .getByRole("heading", { name: "Welcome back" })
     .waitFor();
   await app.evaluate(({ dialog }, path) => {
     dialog.showOpenDialog = async () => ({

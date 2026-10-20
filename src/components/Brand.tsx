@@ -9,7 +9,7 @@ export function BrandIcon({ size = 36 }: { size?: number }) {
       height={size}
       viewBox="0 0 32 32"
       role="img"
-      aria-label="OpenPDF Studio"
+      aria-label="Deck"
     >
       <rect x="1" y="1" width="30" height="30" rx="8" fill="#1560E8" />
       <path

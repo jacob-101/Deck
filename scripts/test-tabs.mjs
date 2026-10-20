@@ -130,7 +130,7 @@ try {
     .click();
   await idle();
   await page
-    .getByRole("heading", { name: "Your PDFs. On your terms." })
+    .getByRole("heading", { name: "Welcome back" })
     .waitFor();
   assert.equal(await page.getByRole("tab").count(), 1);
   assert.deepEqual(errors, []);

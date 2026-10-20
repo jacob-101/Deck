@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Deck — A local PDF workspace for macOS</title>
+  <meta name="description" content="Deck is a local PDF workspace for macOS. Edit, OCR, annotate, sign, redact, and convert PDFs — no accounts, no uploads, no telemetry.">
+  <link rel="icon" type="image/png" href="assets/app-icon.png">
+  <meta property="og:title" content="Deck — A local PDF workspace for macOS">
+  <meta property="og:description" content="Edit, OCR, annotate, sign, redact, and convert PDFs. 100% local. No accounts, no uploads, no telemetry.">
+  <meta property="og:type" content="website">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header" data-header>
+    <div class="container nav">
+      <a class="brand" href="#top" aria-label="Deck home">
+        <img src="assets/app-icon.png" alt="" width="34" height="34">
+        <span class="brand-name">Deck</span>
+      </a>
+
+      <nav class="nav-links" aria-label="Primary">
+        <a href="#features">Features</a>
+        <a href="#tools">PDF Tools</a>
+        <a href="#privacy">Privacy</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+
+      <div class="nav-actions">
+        <a class="btn btn-primary btn-sm" href="#download">Download for macOS</a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+
+    <!-- Hero -->
+    <section class="hero" id="top">
+      <canvas id="hero-ocean" aria-hidden="true"></canvas>
+      <div class="hero-ocean-wash" aria-hidden="true"></div>
+      <div class="container hero-center">
+        <h1 class="hero-title">Own your PDFs.<br>Keep them on your Mac.</h1>
+        <p class="hero-sub">
+          Deck is a local PDF workspace for macOS —
+          <span class="cap-keyword active-cap" data-cap="redact" title="Preview Byte-Level Redaction">redact</span>,
+          <span class="cap-keyword" data-cap="ocr" title="Preview Apple Vision Live OCR">OCR</span>,
+          <span class="cap-keyword" data-cap="annotate" title="Preview Vector Annotations &amp; Sign">annotate &amp; sign</span>,
+          and <span class="cap-keyword" data-cap="cli" title="Preview Headless CLI Automation">automate via CLI</span>.
+          No accounts, no uploads, no telemetry. Your files never leave your machine.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary btn-download" href="#download">
+            <svg class="apple-icon" viewBox="0 0 384 512" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
+            <span class="dl-text">Download for macOS</span>
+            <span class="dl-meta">.dmg · 28 MB</span>
+          </a>
+          <a class="btn btn-ghost" href="#features">See what it does <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></a>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- App showcase -->
+    <section class="showcase" aria-label="Deck app preview">
+      <div class="container">
+        <figure class="showcase-frame">
+          <img src="assets/app-shot.png" alt="The Deck home screen: drag and drop a document to start, with quick actions for signing, editing, scanning, compressing, and converting PDFs" width="1448" height="998" loading="lazy">
+          <figcaption>Home in Deck — drag &amp; drop to start, everything stays on your Mac.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <!-- Trust strip -->
+    <section class="trust" aria-label="Why Deck">
+      <div class="container trust-grid">
+        <div class="trust-item">
+          <div class="trust-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6z"/><path d="m9 12 2.2 2.2L15 10"/></svg></div>
+          <h3>Nothing leaves your Mac</h3>
+          <p>Every edit happens on-device. There is no cloud, no sync service, and no remote processing.</p>
+        </div>
+        <div class="trust-item">
+          <div class="trust-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6z"/><path d="m9 12 2.2 2.2L15 10"/></svg></div>
+          <h3>No account, ever</h3>
+          <p>No sign-up, no login, no subscription. Open the app and start working on your documents.</p>
+        </div>
+        <div class="trust-item">
+          <div class="trust-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 3 8 7 10 4-2 7-5.5 7-10V6z"/><path d="m9 12 2.2 2.2L15 10"/></svg></div>
+          <h3>Offline by default</h3>
+          <p>OCR, conversion, and rendering engines are bundled locally. Opening a PDF never needs a connection.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">Features</span>
+          <h2>Everything you need to work with PDFs</h2>
+          <p>A full local toolkit — from precise annotations to real redaction and offline OCR.</p>
+        </div>
+
+        <div class="features-grid">
+          <article class="feature">
+            <div class="feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19z"/><path d="M13 8l3 3"/></svg></div>
+            <h3>Edit &amp; annotate</h3>
+            <p>Highlight, underline, strike-through, ink, shapes, arrows, text boxes, and sticky notes — with full undo/redo and named history.</p>
+          </article>
+
+          <article class="feature">
+            <div class="feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="9" width="17" height="6" rx="1.5"/></svg></div>
+            <h3>True redaction</h3>
+            <p>Permanently remove underlying text and images, baking a black box into the page. Destructive removal — not a drawing overlay.</p>
+          </article>
+
+          <article class="feature">
+            <div class="feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M4 12h16"/></svg></div>
+            <h3>Offline OCR</h3>
+            <p>Apple Vision OCR recognizes up to 100 pages at 300 DPI, preserves tables as Markdown, and flags low-confidence numbers.</p>
+          </article>
+
+          <article class="feature">
+            <div class="feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19z"/><path d="M13 8l3 3"/></svg></div>
+            <h3>Sign documents</h3>
+            <p>Draw, type in script styles, or import a signature with automatic background removal — resized with proportional aspect preservation.</p>
+          </article>
+
+          <article class="feature">
+            <div class="feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/></svg></div>
+            <h3>Convert anything</h3>
+            <p>PDF↔DOCX in Exact Layout or Editable Text modes, PDF↔PPTX, and high-quality PNG/JPEG↔PDF conversion.</p>
+          </article>
+
+          <article class="feature">
+            <div class="feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.6"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.6"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.6"/></svg></div>
+            <h3>Native macOS feel</h3>
+            <p>Tabbed documents, thumbnails, dark mode, Finder open-file events, drag &amp; drop, and your choice of four workspace palettes.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tools -->
+    <section class="section section-tinted" id="tools">
+      <div class="container">
+        <div class="section-head">
+          <span class="eyebrow">PDF Tools</span>
+          <h2>A whole toolbox, in one workspace</h2>
+          <p>Twenty-plus local utilities — no website, no queue, no file-size ransom.</p>
+        </div>
+
+        <div class="tools-cloud">
+          <span class="tool">Lossless compress</span>
+          <span class="tool">Split by pages / size / chapters</span>
+          <span class="tool">Merge &amp; alternate</span>
+          <span class="tool">AES-256 password</span>
+          <span class="tool">Flatten</span>
+          <span class="tool">Crop &amp; resize to A4 / Letter</span>
+          <span class="tool">Bates numbering</span>
+          <span class="tool">Fill PDF forms</span>
+          <span class="tool">Edit metadata</span>
+          <span class="tool">Extract images</span>
+          <span class="tool">Unlock protected copies</span>
+          <span class="tool">Page-per-sheet (2/4/6/9)</span>
+          <span class="tool">Flip &amp; mirror</span>
+          <span class="tool">Export PNG / JPEG 144–600 DPI</span>
+          <span class="tool">Privacy scanner</span>
+          <span class="tool">Rotate, duplicate, reorder</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Privacy -->
+    <section class="section section-navy" id="privacy">
+      <div class="container privacy-grid">
+        <div class="privacy-copy">
+          <span class="eyebrow eyebrow-light">Privacy</span>
+          <h2>Your documents are nobody&rsquo;s business</h2>
+          <p>
+            Deck is built on the principle that a PDF editor has no reason to see
+            your PDFs. The packaged app blocks web requests, has no analytics, and
+            stores nothing in the cloud.
+          </p>
+        </div>
+        <ul class="privacy-list">
+          <li><strong>No telemetry</strong><span>The packaged app makes no tracking requests.</span></li>
+          <li><strong>No analytics</strong><span>Your reading and editing activity is never measured.</span></li>
+          <li><strong>Local storage</strong><span>Recent-file paths and preferences stay on this Mac.</span></li>
+          <li><strong>No uploads</strong><span>OCR and conversion run entirely on-device.</span></li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Download -->
+    <section class="section" id="download">
+      <div class="container download">
+        <div class="download-card">
+          <img src="assets/app-icon.png" alt="" width="64" height="64">
+          <h2>Get Deck for macOS</h2>
+          <p>A local early release for Apple Silicon. No signing credentials or accounts required.</p>
+          <div class="download-cta">
+            <a class="btn btn-primary" href="#download">Download Deck</a>
+            <span class="download-note">Version 0.4 · AGPL-3.0 · Free</span>
+          </div>
+          <ul class="download-meta">
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Requires macOS</li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>Apple Silicon only</li>
+            <li><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>No account needed</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="section section-tinted" id="faq">
+      <div class="container faq">
+        <div class="section-head">
+          <span class="eyebrow">FAQ</span>
+          <h2>Good to know</h2>
+        </div>
+
+        <div class="faq-list">
+          <details class="faq-item">
+            <summary>Is Deck really free?</summary>
+            <p>Yes. Deck is released under AGPL-3.0 with no license fees, accounts, or subscriptions. It bundles open-source engines like MuPDF and PDF.js under their own licenses.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Does it replace Acrobat?</summary>
+            <p>Deck is a focused, local alternative — not full Acrobat parity. Editing existing page text, scanner capture, form creation, and cryptographic signatures are not implemented. Existing form fields can be filled.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Where are my documents stored?</summary>
+            <p>Nowhere but where you put them. Deck opens and saves your files on your own disk. Recent-file paths are stored locally in the app's data folder; PDF contents are never stored there.</p>
+          </details>
+          <details class="faq-item">
+            <summary>What are the limits?</summary>
+            <p>Inputs up to 50 MB and 500 pages, per-tab history of up to 40 revisions, printing up to 100 pages, and split/exports capped at 100 MB per operation.</p>
+          </details>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer">
+      <div class="footer-brand">
+        <img src="assets/app-icon.png" alt="" width="28" height="28">
+        <span>Deck</span>
+        <p>A local PDF workspace for macOS. No accounts, no uploads, no telemetry.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Product</h4>
+        <a href="#features">Features</a>
+        <a href="#tools">PDF Tools</a>
+        <a href="#download">Download</a>
+      </div>
+      <div class="footer-col">
+        <h4>Resources</h4>
+        <a href="#privacy">Privacy</a>
+        <a href="#faq">FAQ</a>
+        <a href="https://github.com/" rel="noopener">Source</a>
+      </div>
+    </div>
+    <div class="container footer-bottom">
+      <span>© 2026 Deck. Released under AGPL-3.0.</span>
+      <span>Built on open-source foundations — no proprietary PDF SDKs.</span>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+  <script type="module" src="hero-ocean.js"></script>
+</body>
+</html>

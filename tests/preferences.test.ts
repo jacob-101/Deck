@@ -16,7 +16,6 @@ describe("workspace preferences", () => {
     expect(
       normalizePreferences({
         appearance: "dark",
-        theme: "cobalt",
         defaultFit: "width",
         showSidebar: false,
         annotationColor: "#719cd6",
@@ -29,7 +28,6 @@ describe("workspace preferences", () => {
       }),
     ).toEqual({
       appearance: "dark",
-      theme: "cobalt",
       defaultFit: "width",
       showSidebar: false,
       annotationColor: "#719cd6",
@@ -42,7 +40,6 @@ describe("workspace preferences", () => {
     expect(
       normalizePreferences({
         appearance: "surprise",
-        theme: "bad",
         defaultFit: "manual",
         showSidebar: "false",
         annotationColor: "not-a-color",
@@ -80,20 +77,6 @@ describe("workspace preferences", () => {
           key === PREFERENCES_KEY ? '{"appearance":"system"}' : "dark",
       }).appearance,
     ).toBe("system");
-  });
-  it("migrates the legacy forest default theme to azure", () => {
-    expect(
-      readPreferences({
-        getItem: (key) =>
-          key === "openpdf:preferences:v1" ? '{"theme":"forest"}' : null,
-      }).theme,
-    ).toBe("azure");
-    expect(
-      readPreferences({
-        getItem: (key) =>
-          key === "openpdf:preferences:v1" ? '{"theme":"clay"}' : null,
-      }).theme,
-    ).toBe("clay");
   });
 });
 

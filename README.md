@@ -1,4 +1,4 @@
-# OpenPDF Studio
+# Deck
 
 A local PDF workspace for macOS. No accounts, no uploads, no telemetry.
 
@@ -35,7 +35,7 @@ npm run build:cli
 
 See [docs/CLI.md](docs/CLI.md) for its JSON contract, commands, exit codes, secure password handling, and examples.
 
-The application is generated in `release/mac-arm64/OpenPDF Studio.app` on Apple Silicon (or `release/mac/` on Intel). This is a local early release, not an Apple-notarized public distribution. No signing credentials are required for local builds. No files are installed in /Applications automatically.
+The application is generated in `release/mac-arm64/Deck.app` on Apple Silicon (or `release/mac/` on Intel). This is a local early release, not an Apple-notarized public distribution. No signing credentials are required for local builds. No files are installed in /Applications automatically.
 
 ## What works
 
@@ -66,7 +66,7 @@ Use **Take a look around** to open an included four-page sample. It is a real, s
 
 ## Make it yours
 
-Open **OpenPDF Studio → Settings…** or press **⌘,**. Preferences save automatically on this Mac.
+Open **Deck → Settings…** or press **⌘,**. Preferences save automatically on this Mac.
 
 - **General:** default page fit and whether the thumbnail sidebar opens with each PDF.
 - **Appearance:** Light, Dark, or System; Forest & Paper, Slate, Cobalt, or Clay palettes; reduced motion. System reduced-motion preferences are always respected.

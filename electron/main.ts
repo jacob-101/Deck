@@ -38,7 +38,7 @@ protocol.registerSchemesAsPrivileged([
     },
   },
 ]);
-app.setName("OpenPDF Studio");
+app.setName("Deck");
 if (process.env.OPENPDF_TEST_USER_DATA)
   app.setPath("userData", process.env.OPENPDF_TEST_USER_DATA);
 let win: BrowserWindow;
@@ -697,7 +697,7 @@ function registerIPC() {
     if (result.canceled) return false;
     const folder = join(
       result.filePaths[0],
-      `OpenPDF export ${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 6)}`,
+      `Deck export ${new Date().toISOString().replace(/[:.]/g, "-")}-${randomUUID().slice(0, 6)}`,
     );
     await mkdir(folder);
     for (const [index, file] of files.entries()) {
@@ -766,7 +766,7 @@ function createWindow() {
     height: 930,
     minWidth: 980,
     minHeight: 650,
-    title: "OpenPDF Studio",
+    title: "Deck",
     titleBarStyle: "hiddenInset",
     trafficLightPosition: { x: 19, y: 19 },
     backgroundColor: "#E4ECFA",
@@ -856,9 +856,9 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
       {
-        label: "OpenPDF Studio",
+        label: "Deck",
         submenu: [
-          item("About OpenPDF Studio", undefined, "about"),
+          item("About Deck", undefined, "about"),
           { type: "separator" },
           item("Settings…", "CmdOrCtrl+,", "settings"),
           { type: "separator" },

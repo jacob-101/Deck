@@ -363,11 +363,11 @@ export default function App() {
   };
   useEffect(() => {
     document.documentElement.dataset.theme = dark ? "dark" : "light";
-    document.documentElement.dataset.palette = preferences.theme;
+    document.documentElement.dataset.palette = "azure";
     document.documentElement.dataset.motion = preferences.reducedMotion
       ? "reduced"
       : "auto";
-  }, [dark, preferences.theme, preferences.reducedMotion]);
+  }, [dark, preferences.reducedMotion]);
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const listener = () => setSystemDark(media.matches);
@@ -383,8 +383,8 @@ export default function App() {
   useEffect(() => {
     window.desktop?.setDirty(anyDirty);
     document.title = revision
-      ? `${dirty ? "• " : ""}${state.name} — OpenPDF Studio`
-      : "OpenPDF Studio";
+      ? `${dirty ? "• " : ""}${state.name} — Deck`
+      : "Deck";
   }, [dirty, anyDirty, state.name, revision]);
   useEffect(() => {
     if (!toast) return;
@@ -1345,9 +1345,7 @@ export default function App() {
       <header className="titlebar">
         <div className="title-brand">
           <BrandIcon size={26} />
-          <span>
-            OpenPDF <b>Studio</b>
-          </span>
+          <span>Deck</span>
         </div>
         <DocumentTabs
           documents={state.documents}
@@ -2097,7 +2095,7 @@ export default function App() {
           <aside className="welcome-nav">
             <div className="welcome-nav-brand">
               <BrandIcon size={30} />
-              <span>OpenPDF</span>
+              <span>Deck</span>
             </div>
             <nav aria-label="Home">
               <button className="active" aria-current="page">
@@ -2496,7 +2494,7 @@ export default function App() {
                   ? "Take the pages you need."
                   : modal?.kind === "split"
                     ? "A PDF for every page."
-                    : "OpenPDF Studio"}
+                    : "Deck"}
           </h2>
           {modal?.kind === "text" ? (
             <>

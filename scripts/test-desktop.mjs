@@ -97,14 +97,39 @@ const ready = () =>
   );
 const noBusy = () =>
   expect(page.locator(".busy-indicator")).toHaveCount(0, { timeout: 30000 });
+// The welcome screen keeps the converter buttons inside a collapsed details
+// element, so expand it before reaching for a conversion action.
+const openConverters = async () => {
+  const section = page.locator(".welcome-conversion-section");
+  if (!(await section.evaluate((node) => node.open)))
+    await section.locator("summary").click();
+  await expect(section).toHaveAttribute("open", "");
+};
+// Documents live in tabs, so closing the active one falls back to the next
+// open document. Close every document tab to get back to the start page.
+const closeAllDocuments = async () => {
+  for (let attempt = 0; attempt < 12; attempt++) {
+    const closeButtons = page.locator(".document-tab-close");
+    const remaining = await closeButtons.count();
+    if (!remaining) break;
+    await closeButtons.first().click();
+    await noBusy();
+    if ((await closeButtons.count()) >= remaining) break;
+  }
+  await page.getByRole("tab", { name: "Start page", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Welcome back" }),
+  ).toBeVisible();
+};
 try {
   await expect(
-    page.getByRole("heading", { name: "Your PDFs. On your terms." }),
+    page.getByRole("heading", { name: "Welcome back" }),
   ).toBeVisible();
-  await expect(page.locator(".product-icon").first()).toHaveJSProperty(
-    "naturalWidth",
-    256,
-  );
+  const brandIcon = page.locator(".product-icon").first();
+  await expect(brandIcon).toBeVisible();
+  expect(
+    await brandIcon.evaluate((node) => node.getBoundingClientRect().width),
+  ).toBeGreaterThan(0);
   await page.screenshot({
     animations: "disabled",
     path: join(output, "welcome.png"),
@@ -147,8 +172,7 @@ try {
   await page.emulateMedia({ colorScheme: "light" });
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await settings.getByRole("button", { name: "Light appearance" }).click();
-  await settings.getByRole("button", { name: "Cobalt palette" }).click();
-  await expect(page.locator("html")).toHaveAttribute("data-palette", "cobalt");
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "azure");
   await settings.getByRole("switch", { name: "Reduce motion" }).click();
   await expect(page.locator("html")).toHaveAttribute("data-motion", "reduced");
   await page.screenshot({
@@ -166,10 +190,10 @@ try {
   });
   await settings.getByRole("button", { name: "Done", exact: true }).click();
   await page.reload();
-  await expect(page.locator("html")).toHaveAttribute("data-palette", "cobalt");
+  await expect(page.locator("html")).toHaveAttribute("data-palette", "azure");
   expect(
     await page.evaluate(() =>
-      JSON.parse(localStorage.getItem("openpdf:preferences:v1")),
+      JSON.parse(localStorage.getItem("openpdf:preferences:v2")),
     ),
   ).toMatchObject({
     defaultFit: "width",
@@ -178,12 +202,13 @@ try {
     strokeWidth: 5,
   });
   steps.push(
-    "Native Settings, system appearance, live palettes, reduced motion and reload persistence",
+    "Native Settings, system appearance, live theme, reduced motion and reload persistence",
   );
   const publishedMarkdownPDF = join(temp, "Published Markdown.pdf");
   await app.evaluate(({ dialog }, path) => {
     dialog.showSaveDialog = async () => ({ canceled: false, filePath: path });
   }, publishedMarkdownPDF);
+  await openConverters();
   await page.getByRole("button", { name: /Markdown to PDF/ }).click();
   const markup = page.getByRole("dialog", {
     name: "Markdown to PDF",
@@ -203,7 +228,7 @@ try {
   );
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Your PDFs. On your terms." }),
+    page.getByRole("heading", { name: "Welcome back" }),
   ).toBeVisible();
   await page.getByRole("button", { name: /Take a look around/ }).click();
   await ready();
@@ -256,7 +281,7 @@ try {
   const pageImageExportFolder = (
     await readdir(temp, { withFileTypes: true })
   ).find(
-    (entry) => entry.isDirectory() && entry.name.startsWith("OpenPDF export "),
+    (entry) => entry.isDirectory() && entry.name.startsWith("Deck export "),
   );
   expect(pageImageExportFolder).toBeTruthy();
   const exportedPages = await readdir(join(temp, pageImageExportFolder.name));
@@ -296,16 +321,15 @@ try {
   await expect(analysis).toBeVisible();
   const analysisBounds = await analysis.boundingBox();
   if (!analysisBounds) throw new Error("Document Analysis bounds unavailable");
-  expect(analysisBounds.width).toBeLessThanOrEqual(422);
-  expect(analysisBounds.height).toBeLessThanOrEqual(762);
+  expect(analysisBounds.width).toBeLessThanOrEqual(840);
+  expect(analysisBounds.height).toBeLessThanOrEqual(660);
   await expect(analysis).toContainText("Text-based PDF", { timeout: 30000 });
   await expect(analysis.locator("#markdown-preview")).toContainText(
     "A little less friction",
   );
-  await analysis
-    .getByRole("button", { name: "Run Offline OCR", exact: true })
-    .click();
-  await expect(analysis).toContainText("Apple Vision OCR complete", {
+  await analysis.getByRole("tab", { name: "Text recognition" }).click();
+  await analysis.getByRole("button", { name: /Run OCR/ }).click();
+  await expect(analysis).toContainText("Offline OCR completed", {
     timeout: 120000,
   });
   await expect(analysis.locator("#markdown-preview")).toContainText(
@@ -366,11 +390,33 @@ try {
   await settings
     .getByRole("button", { name: "Reset settings", exact: true })
     .click();
-  await expect(page.locator("html")).toHaveAttribute("data-palette", "cobalt");
+  await expect(
+    settings.getByRole("button", { name: "Confirm reset", exact: true }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("openpdf:preferences:v2")),
+    ),
+  ).toMatchObject({
+    defaultFit: "width",
+    showSidebar: false,
+    annotationColor: "#719cd6",
+    strokeWidth: 5,
+  });
   await settings
     .getByRole("button", { name: "Confirm reset", exact: true })
     .click();
-  await expect(page.locator("html")).toHaveAttribute("data-palette", "forest");
+  await expect(settings).toContainText("Default preferences restored.");
+  expect(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("openpdf:preferences:v2")),
+    ),
+  ).toMatchObject({
+    defaultFit: "page",
+    showSidebar: true,
+    annotationColor: "#ddb542",
+    strokeWidth: 2,
+  });
   await page.keyboard.press("Escape");
   await expect(settings).not.toBeVisible();
   await expect(
@@ -758,7 +804,7 @@ try {
     .click();
   await expect(
     signatureModal.getByRole("button", { name: "Draw" }),
-  ).toHaveClass(/active/);
+  ).toHaveAttribute("aria-pressed", "true");
   await signatureModal.getByRole("button", { name: "Cancel" }).click();
   const nativeSignature = await page.evaluate(
     async (values) => {
@@ -869,7 +915,7 @@ try {
   extractedDoc.destroy();
   steps.push("Page range extraction writes a separate two-page PDF");
   const exportFoldersBeforeSplit = new Set(
-    (await readdir(temp)).filter((name) => name.startsWith("OpenPDF export")),
+    (await readdir(temp)).filter((name) => name.startsWith("Deck export")),
   );
   await app.evaluate(({ dialog }, path) => {
     dialog.showOpenDialog = async () => ({
@@ -882,7 +928,7 @@ try {
   await noBusy();
   const exportFolder = (await readdir(temp)).find(
     (name) =>
-      name.startsWith("OpenPDF export") && !exportFoldersBeforeSplit.has(name),
+      name.startsWith("Deck export") && !exportFoldersBeforeSplit.has(name),
   );
   expect(exportFolder).toBeTruthy();
   expect(
@@ -937,7 +983,7 @@ try {
     BrowserWindow.getAllWindows()[0].webContents.send("menu:command", "close");
   });
   await expect(
-    page.getByRole("heading", { name: "Your PDFs. On your terms." }),
+    page.getByRole("heading", { name: "Welcome back" }),
   ).toBeVisible();
   await page
     .locator(".recent-list button")
@@ -987,8 +1033,9 @@ try {
   await expect(analysis).toContainText(/scanned PDF|Image-based PDF/, {
     timeout: 30000,
   });
-  await analysis.getByRole("button", { name: /Run Offline OCR/ }).click();
-  await expect(analysis).toContainText("Apple Vision OCR complete", {
+  await analysis.getByRole("tab", { name: "Text recognition" }).click();
+  await analysis.getByRole("button", { name: /Run OCR/ }).click();
+  await expect(analysis).toContainText("Offline OCR completed", {
     timeout: 120000,
   });
   await expect(analysis.locator("#markdown-preview")).toContainText(
@@ -1004,9 +1051,7 @@ try {
   await app.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows()[0].webContents.send("menu:command", "close"),
   );
-  await expect(
-    page.getByRole("heading", { name: "Your PDFs. On your terms." }),
-  ).toBeVisible();
+  await closeAllDocuments();
   const imageOne = join(temp, "landscape.png");
   const imageTwo = join(temp, "portrait.png");
   const landscape = new mupdf.Pixmap(
@@ -1039,7 +1084,11 @@ try {
     },
     { images: [imageOne, imageTwo], output: imagePDF },
   );
-  await page.getByRole("button", { name: /Images to PDF/ }).click();
+  await openConverters();
+  await page
+    .locator(".welcome-conversion-section")
+    .getByRole("button", { name: /Images to PDF/ })
+    .click();
   const imageEditor = page.getByRole("dialog", { name: "Prepare your PDF" });
   await expect(imageEditor).toBeVisible();
   await expect(imageEditor).toContainText("2 pages");
@@ -1080,9 +1129,7 @@ try {
   await app.evaluate(({ BrowserWindow }) =>
     BrowserWindow.getAllWindows()[0].webContents.send("menu:command", "close"),
   );
-  await expect(
-    page.getByRole("heading", { name: "Your PDFs. On your terms." }),
-  ).toBeVisible();
+  await closeAllDocuments();
   const docxRoot = join(temp, "docx-source");
   await mkdir(join(docxRoot, "_rels"), { recursive: true });
   await mkdir(join(docxRoot, "word"), { recursive: true });
@@ -1116,6 +1163,7 @@ try {
     },
     { word, output: wordPDF },
   );
+  await openConverters();
   await page.getByRole("button", { name: /Word to PDF/ }).click();
   await noBusy();
   await ready();

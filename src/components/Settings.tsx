@@ -19,7 +19,6 @@ import {
   COLOR_NAMES,
   TEXT_COLORS,
   TEXT_COLOR_NAMES,
-  THEMES,
   usePreferences,
 } from "../core/preferences";
 import { APP_VERSION, BrandIcon } from "./Brand";
@@ -96,7 +95,6 @@ export function Settings({
   useEffect(() => {
     dialog.current?.showModal();
   }, []);
-  const theme = THEMES.find((t) => t.id === values.theme)!;
   const titles = {
     general: ["General", "Document view and keyboard shortcuts."],
     appearance: ["Appearance", "Theme, palette, and motion."],
@@ -117,7 +115,7 @@ export function Settings({
           <div className="settings-brand">
             <BrandIcon size={32} />
             <div>
-              <strong>OpenPDF</strong>
+              <strong>Deck</strong>
             </div>
           </div>
           <nav aria-label="Settings sections">
@@ -139,10 +137,6 @@ export function Settings({
               </button>
             ))}
           </nav>
-          <div className="settings-sidebar-foot">
-            <ShieldCheck size={14} />
-            <span>Only on this Mac</span>
-          </div>
         </aside>
         <section className="settings-main">
           <header className="settings-titlebar">
@@ -250,29 +244,6 @@ export function Settings({
                         {label}
                         {values.appearance === id && <Check size={14} />}
                       </span>
-                    </button>
-                  ))}
-                </div>
-                <div className="theme-heading">
-                  <h3 className="setting-group-title">Palette</h3>
-                  <span>{theme.name}</span>
-                </div>
-                <div className="theme-options">
-                  {THEMES.map((item) => (
-                    <button
-                      key={item.id}
-                      className={values.theme === item.id ? "selected" : ""}
-                      aria-pressed={values.theme === item.id}
-                      aria-label={`${item.name} palette`}
-                      onClick={() => update({ theme: item.id })}
-                    >
-                      <span
-                        className="theme-swatch"
-                        style={{ background: item.color }}
-                      >
-                        {values.theme === item.id && <Check size={15} />}
-                      </span>
-                      <span>{item.name}</span>
                     </button>
                   ))}
                 </div>
@@ -497,9 +468,7 @@ export function Settings({
                 <div className="about-product">
                   <BrandIcon size={48} />
                   <div>
-                    <h3>
-                      OpenPDF <span>Studio</span>
-                    </h3>
+                    <h3>Deck</h3>
                     <p>
                       Version {APP_VERSION}{" "}
                       <span className="release-tag">EARLY ACCESS</span>

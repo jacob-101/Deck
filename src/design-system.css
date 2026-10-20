@@ -16,48 +16,18 @@
 }
 :root[data-theme="dark"][data-palette="azure"] {
   color-scheme: dark;
-  --bg: #0f2358;
-  --panel: #122a5f;
-  --surface: #1a3370;
-  --canvas: #0b1b47;
-  --line: #26427f;
-  --text: #eaf1fe;
-  --muted: #9db0d8;
-  --soft: #1e3a7a;
-  --green: #4e8cff;
-  --green-soft: #1e3a7a;
-  --shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
-  --accent: #3b5da6;
-}
-:root[data-palette="slate"] {
-  --green: #4e6275;
-  --green-soft: #e5ebf0;
-  --accent: #afc1ce;
-}
-:root[data-palette="cobalt"] {
-  --green: #365db1;
-  --green-soft: #e6ecf9;
-  --accent: #aebfe3;
-}
-:root[data-palette="clay"] {
-  --green: #9b563f;
-  --green-soft: #f2e8e1;
-  --accent: #d6b7a7;
-}
-:root[data-theme="dark"][data-palette="slate"] {
-  --green: #b5cbdc;
-  --green-soft: #384853;
-  --accent: #718896;
-}
-:root[data-theme="dark"][data-palette="cobalt"] {
-  --green: #afc6ff;
-  --green-soft: #344361;
-  --accent: #6c87b8;
-}
-:root[data-theme="dark"][data-palette="clay"] {
-  --green: #eac0aa;
-  --green-soft: #554039;
-  --accent: #a5826c;
+  --bg: #0a1636;
+  --panel: #0d1b40;
+  --surface: #142554;
+  --canvas: #050c1d;
+  --line: #233560;
+  --text: #eef3ff;
+  --muted: #8fa2ca;
+  --soft: #182a55;
+  --green: #5c9cff;
+  --green-soft: #16295a;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+  --accent: #3f66c4;
 }
 
 /* Shared UI contract from DESIGN.md. Keep screen layout in its own stylesheet;
@@ -98,22 +68,22 @@
   font-size: 14px;
 }
 :root[data-theme="dark"] {
-  --chrome: var(--chrome-deep);
-  --titlebar: #122a5f;
-  --control: #1e3a7a;
-  --rail: #122a5f;
-  --quick-panel: #122a5f;
-  --local-card: #1e3a7a;
-  --action-shadow: 0 8px 18px rgba(0, 0, 0, 0.3);
+  --chrome: #081531;
+  --titlebar: #0b1a3e;
+  --control: #1a2d5c;
+  --rail: #0a1736;
+  --quick-panel: #0a1736;
+  --local-card: #142554;
+  --action-shadow: 0 8px 20px rgba(0, 0, 0, 0.35);
   --danger: #ff9dab;
   --danger-soft: #4b253e;
   --warning-text: #f6d582;
   --warning-soft: #423a28;
-  --backdrop: rgba(3, 10, 30, 0.65);
-  --dialog-shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
+  --backdrop: rgba(2, 6, 20, 0.7);
+  --dialog-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
 }
 :root[data-theme="dark"][data-palette="azure"] {
-  --on-primary: #071b43;
+  --on-primary: #06142e;
 }
 :root[data-theme="dark"]:not([data-palette="azure"]) {
   --on-primary: #17241d;

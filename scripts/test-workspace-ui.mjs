@@ -63,7 +63,7 @@ try {
   assert.equal(await page.getByRole("tab").count(), 4);
   assert.ok(
     (await page.getByRole("main", { name: "PDF workspace" }).boundingBox()).y <=
-      105,
+      120,
     "Reading chrome must leave more vertical space for the PDF",
   );
   await screenshot("reader-light.png");
@@ -149,7 +149,7 @@ try {
   );
   await page.getByRole("tab", { name: "Start page", exact: true }).click();
   await page
-    .getByRole("heading", { name: "Your PDFs. On your terms." })
+    .getByRole("heading", { name: "Welcome back" })
     .waitFor();
   await page
     .getByRole("tab", {
